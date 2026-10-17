@@ -1,0 +1,65 @@
+name: CI / Production Quality Gate
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test-python:
+    name: Python Test Suite & AST Security Checks
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run Pytest with Coverage
+        run: |
+          pytest -v --cov=src --cov-report=term-missing
+
+  build-frontend:
+    name: Frontend React Widget & Bundle Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: "npm"
+          cache-dependency-path: frontend/react-widget/package.json
+
+      - name: Install dependencies
+        working-directory: frontend/react-widget
+        run: npm ci
+
+      - name: Compile React SDK and Standalone Widget
+        working-directory: frontend/react-widget
+        run: npm run build
+
+      - name: Verify build artifacts exist
+        run: |
+          test -f frontend/react-widget/dist/agentic-kb.js
+          test -f frontend/react-widget/dist/agentic-kb-widget.iife.js
+          test -f frontend/react-widget/dist/style.css
+          test -f frontend/react-widget/dist/index.d.ts

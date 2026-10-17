@@ -1,0 +1,61 @@
+# Production Docker Environment Configuration
+agent:
+  name: "Enterprise Data Intelligence Agent"
+  description: "Secure, AST-guarded natural language to SQL knowledgebase agent"
+  version: "1.0.0"
+
+llm:
+  provider: "${LLM_PROVIDER:-mock}"
+  model: "${LLM_MODEL:-gpt-4o-mini}"
+  api_key: "${OPENAI_API_KEY:-mock-key}"
+  temperature: 0.0
+  timeout_seconds: 30.0
+  max_retries: 3
+
+database:
+  provider: "postgresql"
+  host: "${DATABASE_HOST:-postgres}"
+  port: ${DATABASE_PORT:-5432}
+  database: "${DATABASE_NAME:-agentic_kb_db}"
+  username: "${DATABASE_USER:-ai_agent_readonly}"
+  password: "${DATABASE_PASSWORD:-readonly_secret_pass}"
+  ssl_mode: "prefer"
+  pool_size: 10
+  max_overflow: 20
+  pool_timeout: 30.0
+
+knowledgebase:
+  allowed_schemas:
+    - "sales"
+    - "customers"
+  allowed_tables:
+    - "sales.orders"
+    - "sales.products"
+    - "customers.customers"
+  vector_store_type: "inmemory"
+  business_rules:
+    - "Only include COMPLETED orders when analyzing sales revenue."
+    - "Revenue corresponds to total_amount in sales.orders."
+
+security:
+  read_only: true
+  max_rows: 1000
+  query_timeout_seconds: 30.0
+  enforce_limit: true
+  mask_pii: true
+
+response:
+  show_sql: false
+  include_sources: true
+
+cache:
+  enabled: true
+  type: "${CACHE_TYPE:-redis}"
+  host: "${REDIS_HOST:-redis}"
+  port: ${REDIS_PORT:-6379}
+  ttl_seconds: 300
+
+conversation:
+  enabled: true
+  max_history_turns: 10
+  storage_type: "redis"

@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "declarationDir": "./dist",
+    "outDir": "./dist"
+  },
+  "include": [
+    "src/index.ts",
+    "src/embed.ts",
+    "src/components/**/*",
+    "src/hooks/**/*",
+    "src/services/**/*",
+    "src/config/**/*"
+  ]
+}

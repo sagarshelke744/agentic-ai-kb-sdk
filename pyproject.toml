@@ -1,0 +1,78 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentic-kb"
+version = "0.1.0"
+description = "Production-Ready Agentic AI Database Knowledgebase Platform"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+authors = [
+    { name = "Agentic KB Team" }
+]
+keywords = ["agentic-ai", "sql", "knowledgebase", "rag", "database", "llm"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Database",
+]
+
+dependencies = [
+    "pydantic>=2.6.0",
+    "pydantic-settings>=2.2.0",
+    "pyyaml>=6.0.1",
+    "typing-extensions>=4.9.0",
+    "sqlglot>=23.0.0",
+]
+
+[project.optional-dependencies]
+postgres = [
+    "sqlalchemy>=2.0.25",
+    "psycopg2-binary>=2.9.9",
+    "asyncpg>=0.29.0",
+]
+sqlserver = [
+    "sqlalchemy>=2.0.25",
+    "pymssql>=2.2.8",
+]
+llm = [
+    "openai>=1.12.0",
+]
+api = [
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.27.0",
+    "sse-starlette>=2.0.0",
+]
+vector = [
+    "pgvector>=0.2.5",
+]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.5",
+    "pytest-cov>=4.1.0",
+    "ruff>=0.3.0",
+]
+all = [
+    "agentic-kb[postgres,sqlserver,llm,api,vector,dev]",
+]
+
+[project.scripts]
+agentic-kb = "agentic_kb.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"

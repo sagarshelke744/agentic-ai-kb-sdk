@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agentic KnowledgeBase Widget Demo (Phase 9)</title>
+  <link rel="stylesheet" href="../frontend/react-widget/dist/style.css">
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: #0f172a;
+      color: #f8fafc;
+      margin: 0;
+      padding: 40px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .demo-card {
+      max-width: 640px;
+      width: 100%;
+      background: #1e293b;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 32px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    }
+    h1 {
+      font-size: 24px;
+      margin-bottom: 12px;
+      background: linear-gradient(135deg, #6366f1, #a855f7);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    p {
+      color: #94a3b8;
+      line-height: 1.6;
+      margin-bottom: 20px;
+    }
+    pre {
+      background: #0b0f17;
+      padding: 16px;
+      border-radius: 8px;
+      color: #38bdf8;
+      overflow-x: auto;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="demo-card">
+    <h1>Host Application Page</h1>
+    <p>
+      This page demonstrates <strong>Phase 9: Embeddable JavaScript Widget</strong>.
+      Notice there is no React or build tool on this page—only a plain HTML document loading the compiled IIFE script.
+    </p>
+
+    <pre><code>&lt;!-- Include widget styles --&gt;
+&lt;link rel="stylesheet" href="style.css"&gt;
+
+&lt;!-- Include standalone widget script --&gt;
+&lt;script src="agentic-kb-widget.iife.js"&gt;&lt;/script&gt;
+
+&lt;script&gt;
+  const widget = AgenticKB.init({
+    apiUrl: 'http://localhost:8000',
+    assistantName: 'Enterprise Data Assistant',
+    theme: 'dark',
+    position: 'bottom-right',
+    showSources: true,
+    enableStreaming: true
+  });
+&lt;/script&gt;</code></pre>
+
+    <p style="margin-top: 20px; font-size: 14px;">
+      Look at the <strong>bottom-right corner</strong> of this page to interact with the floating AI database chatbot.
+    </p>
+  </div>
+
+  <!-- Load Standalone Widget Bundle -->
+  <script src="../frontend/react-widget/dist/agentic-kb-widget.iife.js"></script>
+  <script>
+    // Initialize the widget
+    if (window.AgenticKB) {
+      window.widgetInstance = window.AgenticKB.init({
+        apiUrl: 'http://localhost:8000',
+        assistantName: 'Enterprise Data Assistant',
+        theme: 'dark',
+        position: 'bottom-right',
+        showSources: true,
+        enableStreaming: true
+      });
+    }
+  </script>
+</body>
+</html>

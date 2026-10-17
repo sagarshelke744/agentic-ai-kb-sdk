@@ -1,0 +1,45 @@
+agent:
+  name: sales-assistant
+  description: Enterprise sales knowledgebase assistant
+
+llm:
+  provider: openai
+  model: gpt-4o
+  api_key_env: OPENAI_API_KEY
+  temperature: 0.0
+
+database:
+  type: postgresql
+  host: ${DB_HOST:-localhost}
+  port: 5432
+  database: sales_db
+  username: ${DB_USER:-ai_agent_user}
+  password_env: DB_PASSWORD
+
+knowledgebase:
+  allowed_schemas:
+    - sales
+    - customer
+
+  allowed_tables:
+    - sales.orders
+    - sales.products
+    - customer.customers
+
+  table_descriptions:
+    sales.orders: "Contains completed and pending customer sales transactions, timestamps, and order values."
+    sales.products: "Contains catalog product items, SKU numbers, categories, and unit prices."
+    customer.customers: "Contains registered company customer accounts, tiers, and contact names."
+
+security:
+  read_only: true
+  max_rows: 1000
+  query_timeout_seconds: 30.0
+
+response:
+  show_sql: false
+  include_sources: true
+
+conversation:
+  enabled: true
+  max_history_turns: 10

@@ -1,0 +1,86 @@
+version: "3.8"
+
+services:
+  agentic-kb:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agentic_kb_api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - AGENTIC_KB_CONFIG=/app/configs/docker.yaml
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=5432
+      - DATABASE_NAME=agentic_kb_db
+      - DATABASE_USER=ai_agent_readonly
+      - DATABASE_PASSWORD=readonly_secret_pass
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - LLM_PROVIDER=mock
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - agentic_net
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: agentic_kb_postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=agentic_kb_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./deploy/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d agentic_kb_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - agentic_net
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: agentic_kb_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - agentic_net
+
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: agentic_kb_prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      - agentic-kb
+    networks:
+      - agentic_net
+
+networks:
+  agentic_net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
