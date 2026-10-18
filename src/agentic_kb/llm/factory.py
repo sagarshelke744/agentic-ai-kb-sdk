@@ -1,5 +1,7 @@
 """LLM Provider Factory and Extensible Registry."""
 
+import os
+
 from typing import Any, Dict, List, Optional, Type, Union
 
 from agentic_kb.exceptions.errors import ConfigurationError
@@ -7,6 +9,7 @@ from agentic_kb.llm.azure import AzureOpenAIProvider
 from agentic_kb.llm.base import BaseLLMProvider
 from agentic_kb.llm.custom import CustomCallableProvider, FallbackLLMProvider
 from agentic_kb.llm.gemini import GeminiProvider
+from agentic_kb.llm.groq import GroqProvider
 from agentic_kb.llm.mock import MockLLMProvider
 from agentic_kb.llm.openai import OpenAIProvider
 from agentic_kb.models.config import LLMConfig
@@ -16,13 +19,14 @@ class LLMProviderFactory:
     """
     Registry and factory for LLM providers.
 
-    Supports built-in providers (OpenAI, Azure, Gemini, Mock) and custom user-registered providers.
+    Supports built-in providers (OpenAI, Azure, Gemini, Groq, Mock) and custom user-registered providers.
     """
 
     _registry: Dict[str, Type[BaseLLMProvider]] = {
         "openai": OpenAIProvider,
         "azure": AzureOpenAIProvider,
         "gemini": GeminiProvider,
+        "groq": GroqProvider,
         "mock": MockLLMProvider,
         "custom": CustomCallableProvider,
     }
@@ -109,9 +113,20 @@ class LLMProviderFactory:
                 **common_kwargs,
             )
 
+        if provider_cls is GroqProvider:
+            # The config default api_key_env targets OpenAI; Groq has its own key variable
+            if not llm_cfg.api_key and llm_cfg.api_key_env == "OPENAI_API_KEY":
+                api_key = os.getenv("GROQ_API_KEY")
+            return GroqProvider(
+                api_key=api_key,
+                base_url=llm_cfg.base_url,
+                **common_kwargs,
+            )
+
         if provider_cls is OpenAIProvider:
             return OpenAIProvider(
                 api_key=api_key,
+                base_url=llm_cfg.base_url,
                 **common_kwargs,
             )
 

@@ -17,18 +17,31 @@ class ColumnMetadata(BaseModel):
     foreign_column: Optional[str] = Field(default=None, description="Referenced column if foreign key")
     description: Optional[str] = Field(default=None, description="Column comment or business definition")
     default_value: Optional[str] = Field(default=None, description="Default column value or expression")
+    sample_values: Optional[List[str]] = Field(default=None, description="Distinct values of a low-cardinality column")
+    value_range: Optional[List[str]] = Field(default=None, description="[min, max] for numeric/date columns")
+    fk_inferred: bool = Field(default=False, description="True if the relation was inferred, not a declared constraint")
 
     def to_ddl_fragment(self) -> str:
         """Render column as concise text for LLM prompts."""
-        parts = [f"{self.name} {self.data_type}"]
+        # Mixed-case names must be double-quoted in SQL on case-folding databases (PostgreSQL)
+        display_name = f'"{self.name}"' if self.name != self.name.lower() else self.name
+        parts = [f"{display_name} {self.data_type}"]
         if self.is_primary_key:
             parts.append("PRIMARY KEY")
         elif not self.is_nullable:
             parts.append("NOT NULL")
         if self.is_foreign_key and self.foreign_table and self.foreign_column:
-            parts.append(f"REFERENCES {self.foreign_table}({self.foreign_column})")
+            suffix = " (inferred)" if self.fk_inferred else ""
+            parts.append(f"REFERENCES {self.foreign_table}({self.foreign_column}){suffix}")
+        notes = []
         if self.description:
-            parts.append(f"-- {self.description}")
+            notes.append(self.description)
+        if self.sample_values:
+            notes.append("values: " + ", ".join(f"'{v}'" for v in self.sample_values))
+        elif self.value_range and len(self.value_range) == 2:
+            notes.append(f"range: {self.value_range[0]} .. {self.value_range[1]}")
+        if notes:
+            parts.append("-- " + "; ".join(notes))
         return " ".join(parts)
 
 

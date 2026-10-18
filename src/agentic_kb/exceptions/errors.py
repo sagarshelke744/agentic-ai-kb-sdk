@@ -3,6 +3,14 @@
 from typing import Optional, Dict, Any
 
 
+def _humanize_seconds(seconds: float) -> str:
+    if seconds < 90:
+        return f"{int(seconds) + 1} seconds"
+    if seconds < 5400:
+        return f"{round(seconds / 60)} minutes"
+    return f"{round(seconds / 3600)} hours"
+
+
 class AgenticKBError(Exception):
     """Base exception for all agentic-kb errors."""
 
@@ -142,11 +150,21 @@ class LLMTimeoutError(LLMError):
 class LLMRateLimitError(LLMError):
     """Raised when LLM provider rate limits are exceeded."""
 
-    def __init__(self, provider: str):
+    def __init__(self, provider: str, retry_after: Optional[float] = None):
+        self.retry_after = retry_after
+        wait_hint = f" in about {_humanize_seconds(retry_after)}" if retry_after else " in a moment"
+        if retry_after and retry_after > 300:
+            user_message = (
+                "The AI provider's usage quota has been reached. "
+                f"Please try again in about {_humanize_seconds(retry_after)}, or ask the administrator to "
+                "switch the model or API key."
+            )
+        else:
+            user_message = f"The AI service is experiencing high demand. Please try again{wait_hint}."
         super().__init__(
             message=f"LLM provider '{provider}' rate limit exceeded",
-            user_safe_message="The AI service is experiencing high demand. Please try again in a moment.",
-            details={"provider": provider},
+            user_safe_message=user_message,
+            details={"provider": provider, "retry_after": retry_after},
         )
 
 
@@ -168,3 +186,22 @@ class KnowledgeBaseError(AgenticKBError):
 
 class VectorStoreError(KnowledgeBaseError):
     """Raised when vector search or embedding generation fails."""
+
+
+def error_payload(exc: Exception) -> Dict[str, Any]:
+    """Build a client-safe, structured error payload (used by SSE `error` events)."""
+    if isinstance(exc, AgenticKBError):
+        retry_after = getattr(exc, "retry_after", None)
+        return {
+            "code": exc.__class__.__name__,
+            "message": exc.user_safe_message,
+            "retryable": isinstance(exc, (LLMRateLimitError, LLMTimeoutError))
+            and (retry_after is None or retry_after <= 300),
+            "retry_after": retry_after,
+        }
+    return {
+        "code": "InternalError",
+        "message": "An unexpected error occurred while processing your request. Please try again.",
+        "retryable": False,
+        "retry_after": None,
+    }

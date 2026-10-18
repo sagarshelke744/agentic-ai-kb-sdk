@@ -25,9 +25,13 @@ from agentic_kb.exceptions.errors import (
     LLMRateLimitError,
     LLMTimeoutError,
 )
+from agentic_kb.observability.events import emit
 from agentic_kb.observability.logging import get_logger
 
 logger = get_logger("agentic_kb.llm")
+
+# Upper bound on how long a provider-hinted retry delay is honoured
+MAX_RETRY_WAIT_SECONDS = 30.0
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -211,6 +215,20 @@ class BaseLLMProvider(abc.ABC):
                 if attempts > self.max_retries:
                     break
                 backoff = (2 ** attempts) * 0.5 + random.uniform(0.1, 0.5)
+                hinted = getattr(e, "retry_after", None)
+                if hinted and hinted > MAX_RETRY_WAIT_SECONDS:
+                    # Quota-style limit (e.g. daily cap): waiting out the retries cannot help
+                    raise
+                if hinted:
+                    backoff = min(float(hinted) + 0.5, MAX_RETRY_WAIT_SECONDS)
+                emit(
+                    "retry",
+                    operation=operation_name,
+                    attempt=attempts,
+                    max_retries=self.max_retries,
+                    wait_seconds=round(backoff, 1),
+                    reason=type(e).__name__,
+                )
                 logger.warning(
                     f"{operation_name} failed with {type(e).__name__}: {str(e)}. "
                     f"Retrying attempt {attempts}/{self.max_retries} in {backoff:.2f}s..."
@@ -240,6 +258,20 @@ class BaseLLMProvider(abc.ABC):
                 if attempts > self.max_retries:
                     break
                 backoff = (2 ** attempts) * 0.5 + random.uniform(0.1, 0.5)
+                hinted = getattr(e, "retry_after", None)
+                if hinted and hinted > MAX_RETRY_WAIT_SECONDS:
+                    # Quota-style limit (e.g. daily cap): waiting out the retries cannot help
+                    raise
+                if hinted:
+                    backoff = min(float(hinted) + 0.5, MAX_RETRY_WAIT_SECONDS)
+                emit(
+                    "retry",
+                    operation=operation_name,
+                    attempt=attempts,
+                    max_retries=self.max_retries,
+                    wait_seconds=round(backoff, 1),
+                    reason=type(e).__name__,
+                )
                 logger.warning(
                     f"{operation_name} failed with {type(e).__name__}: {str(e)}. "
                     f"Retrying attempt {attempts}/{self.max_retries} in {backoff:.2f}s..."

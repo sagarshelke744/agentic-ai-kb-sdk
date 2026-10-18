@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Bot, User, Copy, Check } from 'lucide-react';
+import { Bot, User, Copy, Check, AlertTriangle, RotateCw } from 'lucide-react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { ChatMessage } from '../config/defaults';
@@ -11,12 +11,14 @@ export interface MessageProps {
   message: ChatMessage;
   showSources?: boolean;
   showExecutionSteps?: boolean;
+  onRetry?: (messageId: string) => void;
 }
 
 export const Message: React.FC<MessageProps> = ({
   message,
   showSources = true,
-  showExecutionSteps = true
+  showExecutionSteps = true,
+  onRetry
 }) => {
   const isUser = message.role === 'user';
   const [copied, setCopied] = useState<boolean>(false);
@@ -88,12 +90,26 @@ export const Message: React.FC<MessageProps> = ({
               className="akb-markdown"
               dangerouslySetInnerHTML={{ __html: renderedHtml }}
             />
-          ) : message.status === 'streaming' ? (
+          ) : message.error ? null : message.status === 'streaming' ? (
             <Loading currentStep={null} />
           ) : (
             <p style={{ color: 'var(--akb-text-muted)', fontStyle: 'italic' }}>
               No response generated.
             </p>
+          )}
+
+          {!isUser && message.error && (
+            <div className="akb-error-banner" role="alert">
+              <AlertTriangle size={15} />
+              <div className="akb-error-text">
+                <span>{message.error.message}</span>
+                {message.error.retryable && onRetry && (
+                  <button type="button" className="akb-retry-btn" onClick={() => onRetry(message.id)}>
+                    <RotateCw size={12} /> Retry
+                  </button>
+                )}
+              </div>
+            </div>
           )}
 
           {/* Sources cited */}

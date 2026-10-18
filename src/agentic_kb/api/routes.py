@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sse_starlette.sse import EventSourceResponse
 
 from agentic_kb.agent.agent import AgenticKnowledgeBase
+from agentic_kb.exceptions.errors import error_payload
 from agentic_kb.api.middleware import verify_api_key_header
 from agentic_kb.models.request import ChatRequest
 from agentic_kb.models.response import ChatResponse
@@ -67,15 +68,16 @@ def create_api_router(agent: AgenticKnowledgeBase) -> APIRouter:
         async def event_generator():
             try:
                 async for chunk in agent.astream(request):
+                    # `type` mirrors the SSE event name so plain `data:` parsers can route events too
                     yield {
                         "event": chunk.event,
-                        "data": json.dumps(chunk.data),
+                        "data": json.dumps({"type": chunk.event, **chunk.data}, default=str),
                     }
             except Exception as e:
-                logger.error(f"Error during streaming response: {str(e)}")
+                logger.error(f"Error during streaming response: {type(e).__name__}: {e}")
                 yield {
                     "event": "error",
-                    "data": json.dumps({"error": str(e), "user_safe_message": "An error occurred during streaming."}),
+                    "data": json.dumps({"type": "error", **error_payload(e)}),
                 }
 
         return EventSourceResponse(event_generator())

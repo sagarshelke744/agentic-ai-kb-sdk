@@ -5,7 +5,7 @@
 export interface ExecutionStep {
   id: string;
   name: string;
-  status: 'pending' | 'running' | 'completed' | 'failed';
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'warning';
   details?: string;
   timestamp: number;
 }
@@ -19,6 +19,7 @@ export interface ChatMessage {
   executionSteps?: ExecutionStep[];
   status?: 'streaming' | 'complete' | 'error';
   databaseUsed?: boolean;
+  error?: { message: string; code?: string; retryable?: boolean };
 }
 
 export interface ChatbotConfig {

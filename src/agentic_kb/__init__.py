@@ -57,6 +57,7 @@ from agentic_kb.llm.base import BaseLLMProvider, LLMMessage, LLMResult, TokenUsa
 from agentic_kb.llm.custom import CustomCallableProvider, FallbackLLMProvider
 from agentic_kb.llm.factory import LLMProviderFactory
 from agentic_kb.llm.gemini import GeminiProvider
+from agentic_kb.llm.groq import GroqProvider
 from agentic_kb.llm.mock import MockLLMProvider
 from agentic_kb.llm.openai import OpenAIProvider
 from agentic_kb.models.config import (
@@ -119,6 +120,7 @@ __all__ = [
     "OpenAIProvider",
     "AzureOpenAIProvider",
     "GeminiProvider",
+    "GroqProvider",
     "MockLLMProvider",
     "CustomCallableProvider",
     "FallbackLLMProvider",

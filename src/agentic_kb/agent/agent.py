@@ -1,5 +1,6 @@
 """Main AgenticKnowledgeBase entrypoint."""
 
+import asyncio
 import time
 import uuid
 from pathlib import Path
@@ -13,7 +14,9 @@ from agentic_kb.database.models import DatabaseSchemaMetadata
 from agentic_kb.exceptions.errors import (
     AgenticKBError,
     ConfigurationError,
+    error_payload,
 )
+from agentic_kb.knowledgebase.catalog import apply_catalog, load_catalog
 from agentic_kb.knowledgebase.embeddings import MockEmbeddingProvider
 from agentic_kb.knowledgebase.kb import KnowledgeBase
 from agentic_kb.knowledgebase.metadata import BusinessTerm
@@ -22,6 +25,7 @@ from agentic_kb.llm.factory import LLMProviderFactory
 from agentic_kb.models.config import AgenticKBConfig, DatabaseConfig, LLMConfig
 from agentic_kb.models.request import ChatRequest
 from agentic_kb.models.response import AgentMetadata, ChatResponse, StreamChunk
+from agentic_kb.observability.events import reset_event_sink, set_event_sink
 from agentic_kb.observability.logging import get_logger
 from agentic_kb.security.permissions import PermissionEngine
 from agentic_kb.security.sql_validator import SQLValidator
@@ -156,18 +160,37 @@ class AgenticKnowledgeBase:
             f"allowed_tables={len(self.config.knowledgebase.allowed_tables)}"
         )
 
-    def get_schema_metadata(self) -> DatabaseSchemaMetadata:
+    def _load_catalog(self) -> Optional[Dict[str, Any]]:
+        """Load the reviewed catalog file (descriptions, sample values, relations) if configured."""
+        path = self.config.knowledgebase.catalog_file
+        if not path:
+            return None
+        catalog = load_catalog(Path(path))
+        if catalog is None:
+            self.logger.warning(
+                f"catalog_file '{path}' not found - run `agentic-kb catalog generate` to create it."
+            )
+        return catalog
+
+    def get_schema_metadata(self, use_cache: bool = True) -> DatabaseSchemaMetadata:
         """Discover database schema metadata filtered by allowed schemas and tables with caching."""
         cache_key = f"schema_meta:{','.join(sorted(self.config.knowledgebase.allowed_tables))}"
-        if self.config.cache.enabled:
+        catalog_path = self.config.knowledgebase.catalog_file
+        if catalog_path and Path(catalog_path).exists():
+            cache_key += f":{Path(catalog_path).stat().st_mtime_ns}"  # edits invalidate the cache
+        if use_cache and self.config.cache.enabled:
             cached = self.cache.get(cache_key)
-            if cached is not None and isinstance(cached, DatabaseSchemaMetadata):
-                return cached
+            if cached is not None:
+                if isinstance(cached, DatabaseSchemaMetadata):
+                    return cached
+                if isinstance(cached, dict):
+                    return DatabaseSchemaMetadata.model_validate(cached)
 
         meta = self.db.get_schema_metadata(
             allowed_schemas=self.config.knowledgebase.allowed_schemas,
             allowed_tables=self.config.knowledgebase.allowed_tables,
         )
+        meta = apply_catalog(meta, self._load_catalog(), self.config.knowledgebase.table_descriptions)
         if self.config.cache.enabled:
             self.cache.set(cache_key, meta, ttl_seconds=self.config.cache.ttl_seconds)
         return meta
@@ -240,17 +263,49 @@ class AgenticKnowledgeBase:
             tenant_id=tenant_id,
         )
 
-        yield StreamChunk(event="step", data={"step": "analyzing_question", "message": "Analyzing question..."})
-        yield StreamChunk(event="step", data={"step": "executing_pipeline", "message": "Processing query..."})
+        loop = asyncio.get_running_loop()
+        queue: "asyncio.Queue[Optional[StreamChunk]]" = asyncio.Queue()
 
-        # Run pipeline
-        response = self.ask(req)
+        def _sink(event: str, data: Dict[str, Any]) -> None:
+            loop.call_soon_threadsafe(queue.put_nowait, StreamChunk(event=event, data=data))
 
-        # Stream the synthesized answer tokens
+        def _run() -> ChatResponse:
+            # Copied context carries the sink into the worker thread
+            token = set_event_sink(_sink)
+            try:
+                return self.ask(req)
+            finally:
+                reset_event_sink(token)
+
+        task = asyncio.ensure_future(asyncio.to_thread(_run))
+        task.add_done_callback(lambda _: loop.call_soon_threadsafe(queue.put_nowait, None))
+
+        # Pipeline steps and LLM retry notices arrive live while the worker runs
+        while True:
+            chunk = await queue.get()
+            if chunk is None:
+                break
+            yield chunk
+
+        try:
+            response = task.result()
+        except Exception as e:
+            self.logger.error(f"Streaming pipeline failed: {type(e).__name__}: {e}")
+            yield StreamChunk(event="error", data=error_payload(e))
+            return
+
         for word in response.answer.split(" "):
             yield StreamChunk(event="token", data={"text": word + " "})
 
-        yield StreamChunk(event="done", data={"metadata": response.metadata.model_dump()})
+        yield StreamChunk(
+            event="done",
+            data={
+                "answer": response.answer,
+                "request_id": response.request_id,
+                "conversation_id": response.conversation_id,
+                "metadata": response.metadata.model_dump(),
+            },
+        )
 
     def health_check(self) -> Dict[str, Any]:
         """Perform a comprehensive health check across LLM, Database, Knowledgebase, and Cache layers."""

@@ -1,4 +1,5 @@
 # Agentic KnowledgeBase SDK (`agentic-kb`)
+
 ## Complete Step-by-Step Guide to Run, Test, and Deploy
 
 Production-ready Agentic AI database knowledgebase platform that securely connects conversational AI to enterprise databases with AST-level SQL guardrails, semantic metrics retrieval, FastAPI SSE streaming, and embeddable React/JS widgets.
@@ -43,6 +44,7 @@ Response LLM (Grounded Natural Language Answer & Citations)
 ## Prerequisites
 
 Before starting, ensure you have the following installed:
+
 - **Python**: `3.10`, `3.11`, or `3.12`
 - **Node.js**: `v18+` and `npm 10+`
 - **Docker & Docker Compose** (Optional, for containerized multi-service deployment)
@@ -102,11 +104,13 @@ pytest -v
 ```
 
 Expected output:
+
 ```text
 ============================= 67 passed in ~5s =============================
 ```
 
 Tested layers:
+
 - **AST SQL Security**: Single-statement enforcement, DML/DDL blocking, table/schema/column allowlists, join complexity limits, row limits.
 - **LLM Abstraction**: Mock deterministic provider, Custom callable injection, Multi-provider fallback failover, Exponential backoff & jitter retries.
 - **Database Layer**: Read-only SQLite in-memory mock, PostgreSQL connection pooling & statement timeouts.
@@ -123,6 +127,7 @@ cd ../..
 ```
 
 This compiles:
+
 - `dist/agentic-kb.js` (ES Module for `@agentic-kb/react`)
 - `dist/agentic-kb.umd.cjs` (CommonJS / UMD bundle)
 - `dist/agentic-kb-widget.iife.js` (Standalone browser script with bundled React)
@@ -156,6 +161,7 @@ print("Execution Steps:", response.metadata.get("steps"))
 ```
 
 Run the provided example:
+
 ```bash
 python examples/basic_agent.py
 ```
@@ -171,11 +177,13 @@ agentic-kb serve --config configs/example.yaml --port 8000 --reload
 ```
 
 Or using `uvicorn`:
+
 ```bash
 uvicorn agentic_kb.api.app:create_app --factory --host 0.0.0.0 --port 8000 --reload
 ```
 
 The server starts at `http://localhost:8000`:
+
 - **Interactive Swagger Docs**: `http://localhost:8000/docs`
 - **ReDoc Documentation**: `http://localhost:8000/redoc`
 - **Liveness Probe**: `http://localhost:8000/api/v1/health`
@@ -189,21 +197,27 @@ The server starts at `http://localhost:8000`:
 Open another terminal and test the live endpoints:
 
 ### 5.1. Health Check
+
 ```bash
 curl http://localhost:8000/api/v1/health
 ```
+
 Response:
+
 ```json
 {"status":"ok","agent":"Enterprise Knowledge Assistant","version":"1.0.0"}
 ```
 
 ### 5.2. Synchronous Chat (`POST /api/v1/chat`)
+
 ```bash
 curl -X POST http://localhost:8000/api/v1/chat \
   -H "Content-Type: application/json" \
   -d '{"message": "What were our total sales last month?"}'
 ```
+
 Response:
+
 ```json
 {
   "answer": "Mock generated answer for query: What were our total sales last month?",
@@ -216,12 +230,15 @@ Response:
 ```
 
 ### 5.3. Real-Time Streaming Chat (`POST /api/v1/chat/stream`)
+
 ```bash
 curl -N -X POST http://localhost:8000/api/v1/chat/stream \
   -H "Content-Type: application/json" \
   -d '{"message": "Show sales in Q3"}'
 ```
+
 Streams Server-Sent Events (SSE):
+
 ```text
 event: step
 data: {"name": "sanitizing_input"}
@@ -240,10 +257,13 @@ data: {"metadata": {"database_used": true}}
 ```
 
 ### 5.4. Prometheus Metrics Scraping
+
 ```bash
 curl http://localhost:8000/metrics
 ```
+
 Outputs standard Prometheus metrics:
+
 ```text
 # TYPE http_requests_total counter
 http_requests_total{endpoint="/api/v1/chat",status="200"} 1.0
@@ -265,6 +285,7 @@ npm run dev
 Open `http://localhost:3000` in your browser.
 
 **What you will see:**
+
 - An interactive dashboard with live widget configuration controls (change API URL, switch between Dark/Light mode, toggle SSE streaming, show/hide reasoning steps).
 - A floating chat launcher button in the bottom-right corner with a pulsing breathing glow.
 - Click the button to open the glassmorphic chat modal, select suggested queries, or ask custom questions.
@@ -287,6 +308,7 @@ xdg-open examples/widget_demo.html
 ```
 
 Notice the widget loads completely from the compiled IIFE script:
+
 ```html
 <!-- 1. Include styles -->
 <link rel="stylesheet" href="../frontend/react-widget/dist/style.css" />
@@ -319,18 +341,20 @@ docker compose up -d --build
 ```
 
 ### Verify Running Containers:
+
 ```bash
 docker compose ps
 ```
 
-| Service | Container Name | Port | Description |
-| :--- | :--- | :--- | :--- |
-| **`agentic-kb`** | `agentic_kb_api` | `8000` | FastAPI server with built-in frontend assets |
-| **`postgres`** | `agentic_kb_postgres` | `5432` | PostgreSQL 16 + `pgvector` + `ai_agent_readonly` user |
-| **`redis`** | `agentic_kb_redis` | `6379` | Redis caching & conversation state storage |
-| **`prometheus`** | `agentic_kb_prometheus` | `9090` | Prometheus scraping `agentic-kb:8000/metrics` |
+| Service                  | Container Name            | Port     | Description                                               |
+| :----------------------- | :------------------------ | :------- | :-------------------------------------------------------- |
+| **`agentic-kb`** | `agentic_kb_api`        | `8000` | FastAPI server with built-in frontend assets              |
+| **`postgres`**   | `agentic_kb_postgres`   | `5432` | PostgreSQL 16 + `pgvector` + `ai_agent_readonly` user |
+| **`redis`**      | `agentic_kb_redis`      | `6379` | Redis caching & conversation state storage                |
+| **`prometheus`** | `agentic_kb_prometheus` | `9090` | Prometheus scraping `agentic-kb:8000/metrics`           |
 
 ### Check Service Health:
+
 ```bash
 curl http://localhost:8000/api/v1/health
 curl http://localhost:8000/metrics
@@ -340,6 +364,7 @@ Open Prometheus dashboard at:
 `http://localhost:9090/targets` (shows `agentic-kb` in state `UP`).
 
 ### Stop Containers:
+
 ```bash
 docker compose down
 ```

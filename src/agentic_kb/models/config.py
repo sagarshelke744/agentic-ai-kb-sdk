@@ -9,6 +9,12 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from agentic_kb.exceptions.errors import ConfigurationError
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 ENV_VAR_PATTERN = re.compile(r"\$\{([^}^{]+)\}")
 
 
@@ -47,7 +53,7 @@ AgentConfig = AgentMetadataConfig
 
 class LLMConfig(BaseModel):
     """LLM provider configuration."""
-    provider: str = Field(default="openai", description="LLM provider: openai, azure, gemini, etc.")
+    provider: str = Field(default="openai", description="LLM provider: openai, azure, gemini, groq, etc.")
     model: str = Field(default="gpt-4o", description="Model name to use")
     api_key_env: Optional[str] = Field(default="OPENAI_API_KEY", description="Environment variable holding the API key")
     api_key: Optional[str] = Field(default=None, description="Explicit API key (discouraged in config files)")
@@ -55,6 +61,7 @@ class LLMConfig(BaseModel):
     max_tokens: Optional[int] = Field(default=2000, gt=0)
     timeout_seconds: float = Field(default=60.0, gt=0)
     max_retries: int = Field(default=3, ge=0)
+    base_url: Optional[str] = Field(default=None, description="Override API base URL (OpenAI-compatible gateways, Groq proxies)")
     azure_endpoint: Optional[str] = None
     azure_deployment: Optional[str] = None
     api_version: Optional[str] = None
@@ -123,6 +130,18 @@ class KnowledgeBaseConfig(BaseModel):
     table_descriptions: Dict[str, str] = Field(default_factory=dict)
     column_descriptions: Dict[str, str] = Field(default_factory=dict)
     business_rules: List[str] = Field(default_factory=list)
+    catalog_file: Optional[str] = Field(
+        default=None,
+        description="Path to a catalog YAML (from `agentic-kb catalog generate`) with descriptions, "
+        "sample values and relations merged into the LLM schema context",
+    )
+    catalog_exclude_columns: List[str] = Field(
+        default_factory=lambda: [
+            "*password*", "*passwd*", "*secret*", "*token*", "*otp*", "*email*", "*phone*", "*mobile*",
+            "*ssn*", "*aadhaar*", "pan", "pan_*", "*_pan", "panno", "pannumber", "*card*", "*cvv*", "*address*", "*dob*", "*salary*",
+        ],
+        description="Glob patterns of column names never profiled or sent to the LLM as sample data",
+    )
 
     @field_validator("allowed_tables")
     @classmethod

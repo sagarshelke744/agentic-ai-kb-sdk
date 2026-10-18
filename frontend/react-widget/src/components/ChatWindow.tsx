@@ -14,6 +14,7 @@ export interface ChatWindowProps {
   showExecutionSteps?: boolean;
   onSendMessage: (text: string) => void;
   onStopStreaming: () => void;
+  onRetry?: (messageId: string) => void;
 }
 
 export const ChatWindow: React.FC<ChatWindowProps> = ({
@@ -25,7 +26,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   showSources = true,
   showExecutionSteps = true,
   onSendMessage,
-  onStopStreaming
+  onStopStreaming,
+  onRetry
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [showScrollBottom, setShowScrollBottom] = useState<boolean>(false);
@@ -92,6 +94,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
               message={msg}
               showSources={showSources}
               showExecutionSteps={showExecutionSteps}
+              onRetry={onRetry}
             />
           ))
         )}

@@ -1,0 +1,705 @@
+# ----------------------------------------------------------------------------------------------
+# Agentic KB schema catalog  (generated - REVIEW BEFORE USE)
+#
+# How to review:
+#   * Entries marked `needs_review: true` were written automatically (LLM descriptions, inferred
+#     relations). Fix the text if it is wrong, then delete the `needs_review` line (or set false).
+#   * Edit any `description` freely - edited entries are kept when you regenerate.
+#   * Add business meaning the database can't tell: what status codes mean, units, etc.
+#   * Add/remove `relations` by hand. Declared foreign keys are read from the DB and not listed.
+#   * `values` / `range` are profiled facts and refreshed on every generate.
+#   * Preview exactly what the LLM will see:  agentic-kb catalog show -c <config>
+# ----------------------------------------------------------------------------------------------
+
+version: 1
+generated_at: '2026-10-18T13:41:52+00:00'
+database: ecom_db
+dialect: postgresql
+tables:
+  public.customers:
+    description: Stores customer profile information including contact details, authentication credentials,
+      and account status.
+    row_count: 100
+    columns:
+      customer_id:
+        type: BIGINT
+      first_name:
+        type: VARCHAR(80)
+        values:
+        - Aditya
+        - Ishaan
+        - Arjun
+        - Ira
+        - Neha
+        - Vihaan
+        - Anaya
+        - Anika
+        - Meera
+        - Sana
+        - Diya
+        - Sai
+        - Vivaan
+        - Aadhya
+        - Karan
+        - Aarav
+        - Kavya
+        - Priya
+        - Rahul
+        - Rohan
+      last_name:
+        type: VARCHAR(80)
+        values:
+        - Verma
+        - Das
+        - Joshi
+        - Shah
+        - Patel
+        - Singh
+        - Gupta
+        - Kulkarni
+        - Reddy
+        - Iyer
+        - Kumar
+        - Mehta
+        - Sharma
+        - Nair
+      email:
+        type: VARCHAR(255)
+        skipped: excluded by catalog_exclude_columns
+      phone:
+        type: VARCHAR(30)
+        skipped: excluded by catalog_exclude_columns
+      password_hash:
+        type: TEXT
+        skipped: excluded by catalog_exclude_columns
+      is_active:
+        type: BOOLEAN
+        values:
+        - 'True'
+        description: Boolean flag indicating if the customer account is currently enabled.
+        needs_review: true
+      created_at:
+        type: TIMESTAMP
+        range:
+        - '2025-06-10 19:05:12.459014+05:30'
+        - '2026-10-12 19:05:12.512134+05:30'
+        description: Timestamp of account creation in IST timezone.
+        needs_review: true
+    needs_review: true
+  public.customer_addresses:
+    description: Stores multiple shipping or billing addresses associated with individual customers. Each
+      record represents a specific physical location with a designated recipient and a flag indicating
+      if it is the customer's default address.
+    row_count: 200
+    columns:
+      address_id:
+        type: BIGINT
+        skipped: excluded by catalog_exclude_columns
+      customer_id:
+        type: BIGINT
+      address_type:
+        type: VARCHAR(20)
+        skipped: excluded by catalog_exclude_columns
+        description: Categorizes the address purpose, such as billing or shipping.
+        needs_review: true
+      recipient_name:
+        type: VARCHAR(160)
+      line1:
+        type: VARCHAR(255)
+      line2:
+        type: VARCHAR(255)
+        values:
+        - Flat 301
+        - Apt 2B
+        - Near City Park
+        description: Optional secondary address details like apartment, flat, or landmark.
+        needs_review: true
+      city:
+        type: VARCHAR(100)
+        values:
+        - Pune
+        - Hyderabad
+        - Bengaluru
+        - Jaipur
+        - Mumbai
+        - Chennai
+        - Ahmedabad
+        - Delhi
+      state:
+        type: VARCHAR(100)
+        values:
+        - Maharashtra
+        - Telangana
+        - Karnataka
+        - Rajasthan
+        - Tamil Nadu
+        - Gujarat
+        - Delhi
+      postal_code:
+        type: VARCHAR(20)
+        values:
+        - '411001'
+        - '500001'
+        - '302001'
+        - '560001'
+        - '400001'
+        - '600001'
+        - '380001'
+        - '110001'
+      country:
+        type: VARCHAR(100)
+        values:
+        - India
+      is_default:
+        type: BOOLEAN
+        values:
+        - 'False'
+        - 'True'
+        description: Boolean flag indicating if this is the customer's primary address.
+        needs_review: true
+      created_at:
+        type: TIMESTAMP
+        range:
+        - '2026-10-18 19:05:12.188865+05:30'
+        - '2026-10-18 19:05:12.188865+05:30'
+    needs_review: true
+  public.categories:
+    description: Stores product categories with unique identifiers, display names, URL-friendly slugs,
+      and optional descriptions.
+    row_count: 4
+    columns:
+      category_id:
+        type: BIGINT
+      name:
+        type: VARCHAR(120)
+      slug:
+        type: VARCHAR(140)
+        description: URL-friendly identifier derived from the category name.
+        needs_review: true
+      description:
+        type: TEXT
+    needs_review: true
+  public.products:
+    description: Stores product details including pricing, inventory status, and associations with categories
+      and brands.
+    row_count: 20
+    columns:
+      product_id:
+        type: BIGINT
+      category_id:
+        type: BIGINT
+        description: Foreign key linking to the product's category.
+        needs_review: true
+      brand_id:
+        type: BIGINT
+        description: Foreign key linking to the product's brand.
+        needs_review: true
+      name:
+        type: VARCHAR(200)
+      slug:
+        type: VARCHAR(220)
+        description: URL-friendly identifier derived from the product name.
+        needs_review: true
+      description:
+        type: TEXT
+      sku:
+        type: VARCHAR(80)
+        description: Stock Keeping Unit for inventory management.
+        needs_review: true
+      price:
+        type: NUMERIC(12, 2)
+        range:
+        - '349.00'
+        - '3299.00'
+        description: Current selling price in currency units.
+        needs_review: true
+      compare_at_price:
+        type: NUMERIC(12, 2)
+        range:
+        - '418.80'
+        - '3958.80'
+        description: Original or list price used to display discounts.
+        needs_review: true
+      is_active:
+        type: BOOLEAN
+        values:
+        - 'True'
+        description: Boolean flag indicating if the product is available for sale.
+        needs_review: true
+      created_at:
+        type: TIMESTAMP
+        range:
+        - '2026-10-18 19:05:12.188865+05:30'
+        - '2026-10-18 19:05:12.188865+05:30'
+    needs_review: true
+  public.brands:
+    description: Stores brand information including unique identifiers, display names, and associated
+      web addresses.
+    row_count: 14
+    columns:
+      brand_id:
+        type: BIGINT
+        description: Unique identifier for each brand record.
+        needs_review: true
+      name:
+        type: VARCHAR(120)
+        description: Display name of the brand.
+        needs_review: true
+      website:
+        type: VARCHAR(255)
+        description: URL to the brand's official website.
+        needs_review: true
+    needs_review: true
+  public.product_images:
+    description: Stores image metadata associated with products, including URLs, alternative text, and
+      display order.
+    row_count: 20
+    columns:
+      image_id:
+        type: BIGINT
+      product_id:
+        type: BIGINT
+        description: Foreign key linking to the parent product record.
+        needs_review: true
+      image_url:
+        type: TEXT
+      alt_text:
+        type: VARCHAR(255)
+        description: Descriptive text for accessibility and SEO purposes.
+        needs_review: true
+      sort_order:
+        type: INTEGER
+        values:
+        - '0'
+        description: Integer determining the display sequence of images.
+        needs_review: true
+    needs_review: true
+  public.inventory:
+    description: Tracks current stock levels and reserved units for each product. Links inventory records
+      to specific products via foreign key.
+    row_count: 20
+    columns:
+      inventory_id:
+        type: BIGINT
+      product_id:
+        type: BIGINT
+        description: Foreign key referencing the associated product in the products table.
+        needs_review: true
+      quantity:
+        type: INTEGER
+        range:
+        - '29'
+        - '139'
+        description: Total available stock units for the product.
+        needs_review: true
+      reserved_quantity:
+        type: INTEGER
+        values:
+        - '0'
+        description: Units held for pending orders, currently always zero.
+        needs_review: true
+      updated_at:
+        type: TIMESTAMP
+        range:
+        - '2026-10-18 19:05:12.188865+05:30'
+        - '2026-10-18 19:05:12.188865+05:30'
+        description: Timestamp of the last inventory record modification.
+        needs_review: true
+    needs_review: true
+  public.orders:
+    description: Stores customer order records including financial details, status, and timestamps. Each
+      order is linked to a customer and optionally a coupon or shipping address.
+    row_count: 500
+    columns:
+      order_id:
+        type: BIGINT
+      order_number:
+        type: VARCHAR(40)
+        description: Human-readable unique order identifier.
+        needs_review: true
+      customer_id:
+        type: BIGINT
+        description: Foreign key referencing the customer who placed the order.
+        needs_review: true
+      shipping_address_id:
+        type: BIGINT
+        skipped: excluded by catalog_exclude_columns
+        description: Foreign key referencing the selected shipping address.
+        needs_review: true
+      coupon_id:
+        type: BIGINT
+        description: Foreign key referencing the applied discount coupon.
+        needs_review: true
+      status:
+        type: VARCHAR(30)
+        values:
+        - processing
+        - cancelled
+        - delivered
+        - shipped
+        - pending
+        - confirmed
+        description: 'Current order state: pending, confirmed, processing, shipped, delivered, or cancelled.'
+        needs_review: true
+      subtotal:
+        type: NUMERIC(12, 2)
+        range:
+        - '399.00'
+        - '24189.00'
+        description: Pre-discount order total in INR.
+        needs_review: true
+      discount_amount:
+        type: NUMERIC(12, 2)
+        range:
+        - '0.00'
+        - '2698.65'
+        description: Total discount applied in INR.
+        needs_review: true
+      tax_amount:
+        type: NUMERIC(12, 2)
+        range:
+        - '19.95'
+        - '1209.45'
+        description: Tax charged on the order in INR.
+        needs_review: true
+      shipping_amount:
+        type: NUMERIC(12, 2)
+        range:
+        - '0.00'
+        - '79.00'
+        description: Shipping cost in INR.
+        needs_review: true
+      total_amount:
+        type: NUMERIC(12, 2)
+        range:
+        - '497.95'
+        - '25398.45'
+        description: Final payable amount in INR.
+        needs_review: true
+      currency:
+        type: CHAR(3)
+        values:
+        - INR
+        description: ISO 4217 currency code, currently only INR.
+        needs_review: true
+      placed_at:
+        type: TIMESTAMP
+        range:
+        - '2026-04-21 19:05:12.873311+05:30'
+        - '2026-10-18 19:05:12.974173+05:30'
+        description: Timestamp when the order was placed (IST).
+        needs_review: true
+    needs_review: true
+  public.coupons:
+    description: Stores promotional coupon details including discount type, value, validity period, and
+      activation status.
+    row_count: 3
+    columns:
+      coupon_id:
+        type: BIGINT
+      code:
+        type: VARCHAR(40)
+        description: Unique alphanumeric identifier for the coupon.
+        needs_review: true
+      discount_type:
+        type: VARCHAR(20)
+        description: 'Discount mode: ''percent'' or ''fixed''.'
+        needs_review: true
+      discount_value:
+        type: NUMERIC(10, 2)
+        range:
+        - '10.00'
+        - '200.00'
+        description: Discount amount in currency or percentage.
+        needs_review: true
+      min_order_amount:
+        type: NUMERIC(12, 2)
+        range:
+        - '500.00'
+        - '1500.00'
+        description: Minimum order value required to apply the coupon.
+        needs_review: true
+      starts_at:
+        type: TIMESTAMP
+        range:
+        - '2026-09-18 19:05:12.188865+05:30'
+        - '2026-09-18 19:05:12.188865+05:30'
+        description: Date and time the coupon becomes valid.
+        needs_review: true
+      expires_at:
+        type: TIMESTAMP
+        range:
+        - '2027-10-18 19:05:12.188865+05:30'
+        - '2027-10-18 19:05:12.188865+05:30'
+        description: Date and time the coupon ceases to be valid.
+        needs_review: true
+      is_active:
+        type: BOOLEAN
+        description: Boolean flag indicating if the coupon is currently usable.
+        needs_review: true
+    needs_review: true
+  public.order_items:
+    description: Stores individual line items for customer orders, detailing the specific products, quantities,
+      and pricing for each transaction.
+    row_count: 1283
+    columns:
+      order_item_id:
+        type: BIGINT
+      order_id:
+        type: BIGINT
+        description: Foreign key linking to the parent order in the orders table.
+        needs_review: true
+      product_id:
+        type: BIGINT
+        description: Foreign key linking to the specific product in the products table.
+        needs_review: true
+      product_name:
+        type: VARCHAR(200)
+        values:
+        - Smart Fitness Watch
+        - Analog Wrist Watch
+        - Python Programming Guide
+        - The Daily Productivity Journal
+        - Portable Bluetooth Speaker
+        - Denim Jeans
+        - Non-stick Frying Pan
+        - LED Desk Lamp
+        - Wireless Mouse
+        - Cotton Bedsheet Set
+        - Everyday Running Shoes
+        - Practical SQL Handbook
+        - Short Stories Collection
+        - Casual Backpack
+        - Beginner's Data Science
+        - Stainless Steel Water Bottle
+        - Wireless Bluetooth Headphones
+        - Classic Cotton T-Shirt
+        - USB-C Fast Charger
+        - Storage Container Set
+        description: Denormalized name of the product for easier reporting.
+        needs_review: true
+      sku:
+        type: VARCHAR(80)
+        values:
+        - SKU-00004
+        - SKU-00010
+        - SKU-00016
+        - SKU-00018
+        - SKU-00002
+        - SKU-00009
+        - SKU-00012
+        - SKU-00005
+        - SKU-00014
+        - SKU-00013
+        - SKU-00007
+        - SKU-00017
+        - SKU-00020
+        - SKU-00008
+        - SKU-00001
+        - SKU-00011
+        - SKU-00019
+        - SKU-00006
+        - SKU-00003
+        - SKU-00015
+        description: Unique Stock Keeping Unit identifier for the product.
+        needs_review: true
+      unit_price:
+        type: NUMERIC(12, 2)
+        range:
+        - '349.00'
+        - '3299.00'
+        description: Price per single unit of the product in currency.
+        needs_review: true
+      quantity:
+        type: INTEGER
+        values:
+        - '3'
+        - '2'
+        - '1'
+        description: Number of units of the product included in this order line.
+        needs_review: true
+      line_total:
+        type: NUMERIC(12, 2)
+        range:
+        - '349.00'
+        - '9897.00'
+        description: Total cost for this line item (unit_price multiplied by quantity).
+        needs_review: true
+    needs_review: true
+  public.payments:
+    description: Records individual payment transactions associated with orders, including the payment
+      provider, amount, and current status.
+    row_count: 500
+    columns:
+      payment_id:
+        type: BIGINT
+      order_id:
+        type: BIGINT
+        description: Foreign key linking the payment to a specific order.
+        needs_review: true
+      provider:
+        type: VARCHAR(50)
+        values:
+        - Cash on Delivery
+        - PayPal
+        - Razorpay
+        - Stripe
+        description: Payment gateway or method used (e.g., Stripe, PayPal).
+        needs_review: true
+      transaction_reference:
+        type: VARCHAR(100)
+        description: Unique external identifier assigned by the payment provider.
+        needs_review: true
+      amount:
+        type: NUMERIC(12, 2)
+        range:
+        - '497.95'
+        - '25398.45'
+        description: Monetary value of the payment in currency units.
+        needs_review: true
+      status:
+        type: VARCHAR(30)
+        values:
+        - paid
+        - failed
+        - pending
+        description: 'Current state of the payment: paid, failed, or pending.'
+        needs_review: true
+      paid_at:
+        type: TIMESTAMP
+        range:
+        - '2026-04-21 19:19:12.873311+05:30'
+        - '2026-10-18 19:51:12.688726+05:30'
+        description: Timestamp indicating when the payment was successfully completed.
+        needs_review: true
+    needs_review: true
+  public.shipments:
+    description: Tracks the logistics status and carrier details for individual orders. Links each shipment
+      to its corresponding order and records key fulfillment timestamps.
+    row_count: 500
+    columns:
+      shipment_id:
+        type: BIGINT
+      order_id:
+        type: BIGINT
+        description: Foreign key linking the shipment to its parent order.
+        needs_review: true
+      carrier:
+        type: VARCHAR(100)
+        values:
+        - Delhivery
+        - Blue Dart
+        - DTDC
+        - India Post
+        description: Logistics provider name (e.g., Delhivery, Blue Dart).
+        needs_review: true
+      tracking_number:
+        type: VARCHAR(100)
+        description: Unique identifier for tracking the physical package.
+        needs_review: true
+      status:
+        type: VARCHAR(30)
+        values:
+        - not_shipped
+        - packed
+        - delivered
+        - shipped
+        description: 'Current fulfillment stage: not_shipped, packed, shipped, or delivered.'
+        needs_review: true
+      shipped_at:
+        type: TIMESTAMP
+        range:
+        - '2026-04-23 19:05:12.805033+05:30'
+        - '2026-10-18 19:05:12.998947+05:30'
+        description: Timestamp when the package was handed to the carrier.
+        needs_review: true
+      delivered_at:
+        type: TIMESTAMP
+        range:
+        - '2026-04-25 19:05:12.805033+05:30'
+        - '2026-10-15 19:05:12.619741+05:30'
+        description: Timestamp when the package was successfully delivered.
+        needs_review: true
+    needs_review: true
+  public.reviews:
+    description: Stores customer reviews for products, including ratings, titles, and text content. Each
+      review is linked to a specific customer and product, and optionally to an order.
+    row_count: 194
+    columns:
+      review_id:
+        type: BIGINT
+      customer_id:
+        type: BIGINT
+      product_id:
+        type: BIGINT
+      order_id:
+        type: BIGINT
+        description: Optional link to the specific order associated with the reviewed product.
+        needs_review: true
+      rating:
+        type: SMALLINT
+        values:
+        - '5'
+        - '3'
+        - '4'
+        description: Integer score from 1 to 5 indicating customer satisfaction.
+        needs_review: true
+      title:
+        type: VARCHAR(160)
+        values:
+        - Good quality
+        - Happy with purchase
+        - Nice product
+        - Worth the price
+      review_text:
+        type: TEXT
+      created_at:
+        type: TIMESTAMP
+        range:
+        - '2026-10-18 19:05:12.188865+05:30'
+        - '2026-10-18 19:05:12.188865+05:30'
+    needs_review: true
+  public.wishlists:
+    description: Stores customer wishlists, linking each list to a specific customer with a unique identifier
+      and creation timestamp.
+    row_count: 100
+    columns:
+      wishlist_id:
+        type: BIGINT
+      customer_id:
+        type: BIGINT
+        description: Foreign key referencing the customer who owns the wishlist.
+        needs_review: true
+      name:
+        type: VARCHAR(120)
+        values:
+        - My Wishlist
+      created_at:
+        type: TIMESTAMP
+        range:
+        - '2026-10-18 19:05:12.188865+05:30'
+        - '2026-10-18 19:05:12.188865+05:30'
+        description: Timestamp indicating when the wishlist was created.
+        needs_review: true
+    needs_review: true
+  public.wishlist_items:
+    description: Junction table linking users' wishlists to specific products, recording when each item
+      was added.
+    row_count: 258
+    columns:
+      wishlist_id:
+        type: BIGINT
+        description: Foreign key referencing the parent wishlist.
+        needs_review: true
+      product_id:
+        type: BIGINT
+        description: Foreign key referencing the specific product.
+        needs_review: true
+      added_at:
+        type: TIMESTAMP
+        range:
+        - '2026-10-18 19:05:12.188865+05:30'
+        - '2026-10-18 19:05:12.188865+05:30'
+        description: Timestamp indicating when the item was added.
+        needs_review: true
+    needs_review: true

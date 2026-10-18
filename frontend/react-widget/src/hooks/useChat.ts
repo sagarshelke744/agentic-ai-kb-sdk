@@ -4,7 +4,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { ChatbotConfig, ChatMessage, ExecutionStep, DEFAULT_CONFIG } from '../config/defaults';
-import { ChatApiService, ChatResponse } from '../services/api';
+import { ChatApiService, ChatResponse, StreamError } from '../services/api';
 
 export function useChat(userConfig: ChatbotConfig) {
   const config = { ...DEFAULT_CONFIG, ...userConfig };
@@ -76,6 +76,31 @@ export function useChat(userConfig: ChatbotConfig) {
       sessionStorage.setItem('akb_session_id', newId);
     }
   }, [config.persistSession, stopStreaming]);
+
+  // Record a failed response: close out running steps and attach a structured error to the message
+  const markStreamFailed = useCallback((messageId: string, err: Error) => {
+    const streamErr = err instanceof StreamError ? err : null;
+    const message =
+      streamErr?.message ||
+      (err instanceof TypeError
+        ? 'Could not reach the server. Please check your connection and try again.'
+        : err.message || 'Something went wrong while processing your request.');
+    const retryable = streamErr ? streamErr.retryable : err instanceof TypeError;
+    setError(message);
+    setMessages((prev) =>
+      prev.map((m) => {
+        if (m.id !== messageId) return m;
+        return {
+          ...m,
+          status: 'error',
+          executionSteps: (m.executionSteps || []).map((st) =>
+            st.status === 'running' ? { ...st, status: 'failed' as const } : st
+          ),
+          error: { message, code: streamErr?.code, retryable }
+        };
+      })
+    );
+  }, []);
 
   const sendMessage = useCallback(
     async (text: string) => {
@@ -158,7 +183,7 @@ export function useChat(userConfig: ChatbotConfig) {
                     return {
                       ...m,
                       content: res.answer || m.content,
-                      sources: res.metadata?.tables_used || [],
+                      sources: res.metadata?.sources || res.metadata?.tables_used || [],
                       databaseUsed: res.metadata?.database_used,
                       executionSteps: steps,
                       status: 'complete'
@@ -171,19 +196,7 @@ export function useChat(userConfig: ChatbotConfig) {
                 abortControllerRef.current = null;
               },
               onError: (err: Error) => {
-                setError(err.message);
-                setMessages((prev) =>
-                  prev.map((m) => {
-                    if (m.id !== assistantMessageId) return m;
-                    return {
-                      ...m,
-                      status: 'error',
-                      content:
-                        m.content ||
-                        'I encountered an error retrieving data from the knowledgebase. Please check your query or try again.'
-                    };
-                  })
-                );
+                markStreamFailed(assistantMessageId, err);
                 setIsStreaming(false);
                 setIsLoading(false);
                 setCurrentStep(null);
@@ -201,19 +214,9 @@ export function useChat(userConfig: ChatbotConfig) {
               )
             );
           } else {
-            const errorMsg = err instanceof Error ? err.message : String(err);
-            setError(errorMsg);
-            setMessages((prev) =>
-              prev.map((m) => {
-                if (m.id !== assistantMessageId) return m;
-                return {
-                  ...m,
-                  status: 'error',
-                  content:
-                    m.content ||
-                    'I encountered an error connecting to the service. Please verify your connection or try again.'
-                };
-              })
+            markStreamFailed(
+              assistantMessageId,
+              err instanceof Error ? err : new Error(String(err))
             );
           }
           setIsStreaming(false);
@@ -235,7 +238,7 @@ export function useChat(userConfig: ChatbotConfig) {
               return {
                 ...m,
                 content: res.answer,
-                sources: res.metadata?.tables_used || [],
+                sources: res.metadata?.sources || res.metadata?.tables_used || [],
                 databaseUsed: res.metadata?.database_used,
                 status: 'complete'
               };
@@ -268,6 +271,18 @@ export function useChat(userConfig: ChatbotConfig) {
     [config.enableStreaming, isLoading, isStreaming, sessionId]
   );
 
+  // Re-ask the question that preceded a failed assistant message
+  const retryMessage = useCallback(
+    (messageId: string) => {
+      const idx = messages.findIndex((m) => m.id === messageId);
+      const userMsg = idx > 0 ? messages[idx - 1] : undefined;
+      if (!userMsg || userMsg.role !== 'user') return;
+      setMessages((prev) => prev.filter((_, i) => i !== idx - 1 && i !== idx));
+      void sendMessage(userMsg.content);
+    },
+    [messages, sendMessage]
+  );
+
   return {
     messages,
     isLoading,
@@ -277,6 +292,7 @@ export function useChat(userConfig: ChatbotConfig) {
     sessionId,
     sendMessage,
     stopStreaming,
-    clearHistory
+    clearHistory,
+    retryMessage
   };
 }

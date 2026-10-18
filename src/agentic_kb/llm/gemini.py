@@ -215,10 +215,22 @@ class GeminiProvider(BaseLLMProvider):
         for chunk in self.stream(messages, temperature=temperature, max_tokens=max_tokens, **kwargs):
             yield chunk
 
+    @staticmethod
+    def _parse_retry_after(text: str) -> Optional[float]:
+        """Extract Google's suggested retry delay ("retry in 11h27m46.7s" / "retry_delay { seconds: 23 }")."""
+        import re
+
+        m = re.search(r"retry in (?:(\d+)h)?(?:(\d+)m)?([\d.]+)s", text, re.I)
+        if m:
+            h, mi, sec = m.groups()
+            return int(h or 0) * 3600 + int(mi or 0) * 60 + float(sec)
+        m = re.search(r"retry_delay\s*\{\s*seconds:\s*(\d+)", text, re.I)
+        return float(m.group(1)) if m else None
+
     def _handle_api_error(self, err: Exception) -> None:
         err_msg = str(err).lower()
-        if "quota" in err_msg or "rate" in err_msg or "429" in err_msg:
-            raise LLMRateLimitError(provider="gemini") from err
+        if "quota" in err_msg or "rate limit" in err_msg or "resourceexhausted" in err_msg or "429" in err_msg:
+            raise LLMRateLimitError(provider="gemini", retry_after=self._parse_retry_after(str(err))) from err
         if "timeout" in err_msg or "timed out" in err_msg or "deadline" in err_msg:
             raise LLMTimeoutError(provider="gemini", timeout_seconds=self.timeout_seconds) from err
         raise LLMError(f"Gemini error: {str(err)}") from err

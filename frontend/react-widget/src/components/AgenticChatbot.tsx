@@ -30,6 +30,7 @@ export const AgenticChatbot: React.FC<AgenticChatbotProps> = (props) => {
     isLoading,
     isStreaming,
     sendMessage,
+    retryMessage,
     stopStreaming,
     clearHistory
   } = useChat(mergedConfig);
@@ -110,6 +111,7 @@ export const AgenticChatbot: React.FC<AgenticChatbotProps> = (props) => {
               showSources={mergedConfig.showSources}
               showExecutionSteps={mergedConfig.showExecutionSteps}
               onSendMessage={sendMessage}
+              onRetry={retryMessage}
               onStopStreaming={stopStreaming}
             />
           )}

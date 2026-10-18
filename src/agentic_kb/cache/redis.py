@@ -56,7 +56,15 @@ class RedisCacheProvider(BaseCacheProvider):
 
     def set(self, key: str, value: Any, ttl_seconds: Optional[int] = None) -> None:
         ttl = ttl_seconds if ttl_seconds is not None else self.default_ttl
-        serialized = json.dumps(value)
+        try:
+            if hasattr(value, "model_dump"):
+                serialized = json.dumps(value.model_dump(), default=str)
+            elif hasattr(value, "dict"):
+                serialized = json.dumps(value.dict(), default=str)
+            else:
+                serialized = json.dumps(value, default=str)
+        except Exception:
+            serialized = json.dumps(str(value))
 
         if self._is_connected and self._client:
             try:

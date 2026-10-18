@@ -73,7 +73,10 @@ class SQLValidator:
         self.max_rows = max_rows
         self.enforce_limit = enforce_limit
         self.max_joins = max_joins
-        self.dialect = dialect
+        # Map SDK dialect names to sqlglot dialect names
+        self.dialect = {"postgresql": "postgres", "sqlserver": "tsql", "mssql": "tsql"}.get(
+            dialect.lower(), dialect.lower()
+        )
 
     def validate(self, sql_query: str) -> SQLValidationResult:
         """Parse and validate SQL query against security boundaries."""

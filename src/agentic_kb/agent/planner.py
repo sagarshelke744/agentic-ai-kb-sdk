@@ -15,12 +15,14 @@ from agentic_kb.agent.prompts import (
 )
 from agentic_kb.database.base import BaseDatabaseProvider
 from agentic_kb.database.models import DatabaseSchemaMetadata, QueryResult
-from agentic_kb.exceptions.errors import SQLValidationError
+from agentic_kb.exceptions.errors import LLMRateLimitError, LLMTimeoutError, SQLValidationError
 from agentic_kb.llm.base import BaseLLMProvider, LLMMessage
 from agentic_kb.models.config import AgenticKBConfig
 from agentic_kb.models.request import ChatRequest
 from agentic_kb.models.response import AgentMetadata, ChatResponse
+from agentic_kb.observability.events import emit
 from agentic_kb.observability.logging import get_logger
+from agentic_kb.security.identifiers import fix_identifier_case
 from agentic_kb.security.permissions import PermissionEngine
 from agentic_kb.security.sanitizer import DataMasker, InputSanitizer
 from agentic_kb.security.sql_validator import SQLValidator
@@ -51,13 +53,18 @@ class SQLAgentPlanner:
         start_time = time.time()
         request_id = str(uuid.uuid4())
         steps_taken: List[str] = []
+        step_labels = {'input_sanitization': 'Validating question', 'intent_detection': 'Understanding your question', 'direct_response': 'Answering directly', 'schema_selection': 'Selecting relevant tables', 'sql_generation': 'Generating SQL query', 'sql_validation': 'Validating query safety', 'rls_enforcement': 'Applying access rules', 'database_execution': 'Running query on database', 'response_synthesis': 'Writing the answer'}
+
+        def _step(name: str) -> None:
+            steps_taken.append(name)
+            emit("step", step=name, message=step_labels.get(name, name))
 
         # Step 1: Input Sanitization (Prompt injection defense)
-        steps_taken.append("input_sanitization")
+        _step("input_sanitization")
         sanitized_question = InputSanitizer.validate_input(request.message)
 
         # Step 2: Intent Detection
-        steps_taken.append("intent_detection")
+        _step("intent_detection")
         available_tables = list(schema_metadata.tables.keys())
         intent_prompt = get_intent_detection_prompt(available_tables)
 
@@ -70,6 +77,8 @@ class SQLAgentPlanner:
                 response_model=IntentDecision,
                 temperature=0.0,
             )
+        except (LLMRateLimitError, LLMTimeoutError):
+            raise
         except Exception as e:
             logger.info(f"Structured intent fallback: {str(e)}. Defaulting to database lookup.")
             # Default to database search if available tables exist
@@ -81,7 +90,7 @@ class SQLAgentPlanner:
 
         # If database is not needed, generate direct response
         if not intent_decision.requires_database:
-            steps_taken.append("direct_response")
+            _step("direct_response")
             direct_res = llm.generate([
                 LLMMessage.system(
                     self.config.response.system_instructions
@@ -103,7 +112,7 @@ class SQLAgentPlanner:
             )
 
         # Step 3: Schema Selection and Knowledgebase Retrieval
-        steps_taken.append("schema_selection")
+        _step("schema_selection")
         selected_tables = intent_decision.relevant_tables or available_tables
         active_business_rules = list(self.config.knowledgebase.business_rules)
 
@@ -122,7 +131,7 @@ class SQLAgentPlanner:
             schema_context = schema_metadata.to_prompt_context()
 
         # Step 4: SQL Generation
-        steps_taken.append("sql_generation")
+        _step("sql_generation")
         sql_gen_prompt = get_sql_generation_prompt(
             dialect=db.dialect_name,
             schema_context=schema_context,
@@ -140,6 +149,8 @@ class SQLAgentPlanner:
                 temperature=0.0,
             )
             raw_sql = sql_plan.sql
+        except (LLMRateLimitError, LLMTimeoutError):
+            raise
         except Exception:
             # Fallback to text generation
             gen_result = llm.generate([
@@ -154,11 +165,13 @@ class SQLAgentPlanner:
                 raw_sql = raw_sql.split("```")[1].split("```")[0].strip()
 
         # Step 5: SQL AST Validation and Limit Enforcement
-        steps_taken.append("sql_validation")
+        _step("sql_validation")
+        # Match identifiers to the schema's exact spelling (e.g. carNo -> "carNo" on PostgreSQL)
+        raw_sql = fix_identifier_case(raw_sql, schema_metadata, db.dialect_name)
         cleaned_sql = validator.validate_or_raise(raw_sql)
 
         # Step 6: Row-Level Security Predicate Injection (if tenant/user specified)
-        steps_taken.append("rls_enforcement")
+        _step("rls_enforcement")
         final_sql = permissions.apply_row_level_security(
             cleaned_sql,
             tenant_id=request.tenant_id,
@@ -166,7 +179,7 @@ class SQLAgentPlanner:
         )
 
         # Step 7: Safe Database Execution
-        steps_taken.append("database_execution")
+        _step("database_execution")
         from agentic_kb.observability.metrics import metrics_collector
         query_result = db.execute(
             final_sql,
@@ -183,7 +196,7 @@ class SQLAgentPlanner:
         ]
 
         # Step 9: Grounded Response Synthesis
-        steps_taken.append("response_synthesis")
+        _step("response_synthesis")
         result_summary = json.dumps(masked_rows[:20], indent=2, default=str)
         if query_result.is_truncated:
             result_summary += f"\n[Note: Total rows truncated at {len(query_result.rows)}]"

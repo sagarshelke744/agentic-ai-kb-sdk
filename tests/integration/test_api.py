@@ -136,3 +136,48 @@ def test_chat_streaming_endpoint(client):
     response = client.post("/api/v1/chat/stream", json=payload)
     assert response.status_code == 200
     assert "text/event-stream" in response.headers.get("content-type", "")
+
+
+def _sse_events(body: str):
+    """Parse an SSE body into (event, payload) tuples."""
+    import json
+
+    events = []
+    for block in body.replace("\r\n", "\n").split("\n\n"):
+        name, data = "", ""
+        for line in block.split("\n"):
+            if line.startswith("event:"):
+                name = line[6:].strip()
+            elif line.startswith("data:"):
+                data = line[5:].strip()
+        if name and data:
+            events.append((name, json.loads(data)))
+    return events
+
+
+def test_chat_stream_emits_pipeline_steps_and_final_answer(client):
+    response = client.post("/api/v1/chat/stream", json={"message": "How many completed orders?"})
+    events = _sse_events(response.text)
+    names = [n for n, _ in events]
+
+    assert "step" in names
+    assert any(p.get("step") == "database_execution" for n, p in events if n == "step")
+    assert names[-1] == "done"
+    assert events[-1][1]["answer"] == "There are 2 completed orders."
+
+
+def test_chat_stream_reports_rate_limit_as_structured_error(client, monkeypatch):
+    from agentic_kb.exceptions.errors import LLMRateLimitError
+
+    def _raise(self, *args, **kwargs):
+        raise LLMRateLimitError(provider="gemini", retry_after=41000)
+
+    monkeypatch.setattr(AgenticKnowledgeBase, "ask", _raise)
+    response = client.post("/api/v1/chat/stream", json={"message": "anything"})
+    events = _sse_events(response.text)
+
+    name, payload = events[-1]
+    assert name == "error"
+    assert payload["code"] == "LLMRateLimitError"
+    assert payload["retryable"] is False
+    assert "quota" in payload["message"].lower()

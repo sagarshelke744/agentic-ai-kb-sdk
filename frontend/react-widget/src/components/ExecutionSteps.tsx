@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronRight, CheckCircle2, CircleDashed } from 'lucide-react';
+import { ChevronDown, ChevronRight, CheckCircle2, CircleDashed, XCircle, AlertTriangle } from 'lucide-react';
 import { ExecutionStep } from '../config/defaults';
 
 export interface ExecutionStepsProps {
@@ -25,6 +25,8 @@ export const ExecutionSteps: React.FC<ExecutionStepsProps> = ({ steps, isStreami
         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           {isStreaming ? (
             <span className="akb-spinner" style={{ width: 12, height: 12 }} />
+          ) : steps.some((st) => st.status === 'failed') ? (
+            <XCircle size={13} color="var(--akb-accent-rose)" />
           ) : (
             <CheckCircle2 size={13} color="var(--akb-accent-emerald)" />
           )}
@@ -40,16 +42,22 @@ export const ExecutionSteps: React.FC<ExecutionStepsProps> = ({ steps, isStreami
           {steps.map((step) => {
             const isRunning = step.status === 'running';
             const isCompleted = step.status === 'completed';
+            const isFailed = step.status === 'failed';
+            const isWarning = step.status === 'warning';
 
             return (
               <div
                 key={step.id}
                 className={`akb-step-item ${isRunning ? 'akb-step-running' : ''} ${
                   isCompleted ? 'akb-step-completed' : ''
-                }`}
+                } ${isFailed ? 'akb-step-failed' : ''} ${isWarning ? 'akb-step-warning' : ''}`}
               >
                 {isRunning ? (
                   <span className="akb-spinner" style={{ width: 11, height: 11 }} />
+                ) : isFailed ? (
+                  <XCircle size={13} />
+                ) : isWarning ? (
+                  <AlertTriangle size={13} />
                 ) : isCompleted ? (
                   <CheckCircle2 size={13} />
                 ) : (

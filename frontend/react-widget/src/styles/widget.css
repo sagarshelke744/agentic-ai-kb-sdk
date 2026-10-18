@@ -874,3 +874,56 @@
     border: none !important;
   }
 }
+
+/* Failed / warning execution steps */
+.akb-step-item.akb-step-failed {
+  color: var(--akb-accent-rose);
+}
+
+.akb-step-item.akb-step-warning {
+  color: var(--akb-accent-amber);
+}
+
+/* Error banner inside assistant messages */
+.akb-error-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--akb-accent-rose);
+  border-radius: var(--akb-radius-md);
+  color: var(--akb-accent-rose);
+  background: color-mix(in srgb, var(--akb-accent-rose) 10%, transparent);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.akb-error-banner svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.akb-error-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.akb-retry-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.akb-retry-btn:hover {
+  background: color-mix(in srgb, var(--akb-accent-rose) 15%, transparent);
+}

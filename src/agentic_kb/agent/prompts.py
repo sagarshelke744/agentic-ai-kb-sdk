@@ -62,6 +62,7 @@ Business Rules & Constraints:
 - Return ONLY valid {dialect} SELECT statements.
 - NEVER generate INSERT, UPDATE, DELETE, DROP, ALTER, TRUNCATE, or CREATE statements.
 - Only query tables and columns defined in the schema above.
+- Identifiers are case-sensitive. Copy table and column names EXACTLY as written in the schema, and wrap any name containing upper-case letters (e.g. camelCase like "carNo") in double quotes. Never lower-case them.
 - Ensure proper JOIN conditions and WHERE filters.
 - Default to limiting results to {max_rows} rows if applicable.
 """

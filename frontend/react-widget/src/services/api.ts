@@ -11,9 +11,21 @@ export interface ChatResponse {
   metadata?: {
     database_used?: boolean;
     tables_used?: string[];
+    sources?: string[];
     execution_time_ms?: number;
     tokens_used?: number;
   };
+}
+
+export class StreamError extends Error {
+  code?: string;
+  retryable: boolean;
+  constructor(message: string, code?: string, retryable = false) {
+    super(message);
+    this.name = 'StreamError';
+    this.code = code;
+    this.retryable = retryable;
+  }
 }
 
 export interface StreamCallbacks {
@@ -143,6 +155,66 @@ export class ChatApiService {
 
     const decoder = new TextDecoder('utf-8');
     let buffer = '';
+    let finished = false;
+
+    const stepId = () => `step-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+
+    // Route one parsed SSE event (name + JSON payload) to the callbacks
+    const dispatch = (eventName: string, event: Record<string, any>) => {
+      const type = eventName || event.type;
+      if (type === 'step') {
+        callbacks.onStep?.({
+          id: stepId(),
+          name: event.message || event.step || 'Processing...',
+          status: 'running',
+          timestamp: event.timestamp || Date.now()
+        });
+      } else if (type === 'retry') {
+        callbacks.onStep?.({
+          id: stepId(),
+          name: `AI service busy — retrying in ${Math.ceil(event.wait_seconds ?? 0)}s (attempt ${event.attempt}/${event.max_retries})`,
+          status: 'warning',
+          timestamp: Date.now()
+        });
+      } else if (type === 'token') {
+        callbacks.onToken?.(event.text ?? event.token ?? '');
+      } else if (type === 'done' || type === 'final') {
+        finished = true;
+        callbacks.onComplete?.({
+          answer: event.answer || '',
+          requestId: event.request_id || '',
+          sessionId: event.conversation_id || event.session_id || sessionId,
+          metadata: event.metadata
+        });
+      } else if (type === 'error') {
+        finished = true;
+        callbacks.onError?.(
+          new StreamError(
+            event.message || event.user_safe_message || 'Stream error occurred',
+            event.code,
+            Boolean(event.retryable)
+          )
+        );
+      }
+    };
+
+    const processBlock = (block: string) => {
+      let eventName = '';
+      const dataLines: string[] = [];
+      for (const rawLine of block.split('\n')) {
+        const line = rawLine.replace(/\r$/, '');
+        if (!line || line.startsWith(':')) continue; // heartbeat / comment
+        if (line.startsWith('event:')) eventName = line.slice(6).trim();
+        else if (line.startsWith('data:')) dataLines.push(line.slice(5).trim());
+      }
+      const jsonStr = dataLines.join('\n');
+      if (!jsonStr || jsonStr === '[DONE]') return;
+      try {
+        dispatch(eventName, JSON.parse(jsonStr));
+      } catch (err) {
+        console.warn('Failed to parse SSE event chunk:', jsonStr, err);
+      }
+    };
 
     try {
       while (true) {
@@ -150,53 +222,18 @@ export class ChatApiService {
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        // keep the last incomplete chunk in the buffer
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed || trimmed.startsWith(':')) {
-            // Heartbeat or comment
-            continue;
-          }
-
-          if (trimmed.startsWith('data:')) {
-            const jsonStr = trimmed.slice(5).trim();
-            if (jsonStr === '[DONE]') {
-              continue;
-            }
-
-            try {
-              const event = JSON.parse(jsonStr);
-
-              if (event.type === 'step') {
-                callbacks.onStep?.({
-                  id: `step-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-                  name: event.step || 'Processing...',
-                  status: 'running',
-                  timestamp: event.timestamp || Date.now()
-                });
-              } else if (event.type === 'token') {
-                callbacks.onToken?.(event.token || '');
-              } else if (event.type === 'final') {
-                callbacks.onComplete?.({
-                  answer: event.answer || '',
-                  requestId: event.request_id || '',
-                  sessionId: event.session_id || sessionId,
-                  metadata: event.metadata
-                });
-              } else if (event.type === 'error') {
-                callbacks.onError?.(new Error(event.message || 'Stream error occurred'));
-              }
-            } catch (err) {
-              console.warn('Failed to parse SSE event chunk:', jsonStr, err);
-            }
-          }
-        }
+        // SSE events are separated by a blank line (LF or CRLF)
+        const blocks = buffer.split(/\r?\n\r?\n/);
+        buffer = blocks.pop() || '';
+        for (const block of blocks) processBlock(block);
       }
+      if (buffer.trim()) processBlock(buffer);
     } finally {
       reader.releaseLock();
+    }
+
+    if (!finished) {
+      throw new StreamError('The connection closed before the answer was complete.', 'StreamInterrupted', true);
     }
   }
 

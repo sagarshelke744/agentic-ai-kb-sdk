@@ -1,0 +1,36 @@
+agent:
+  name: Enterprise Knowledge Assistant
+  description: Mock Agentic AI Database Assistant for local testing
+  version: 1.0.0
+
+llm:
+  provider: mock
+  model: mock-gpt-4o
+
+database:
+  type: sqlite
+  database: sales_demo
+  host: localhost
+  username: test_user
+
+knowledgebase:
+  allowed_tables:
+    - sales_orders
+    - customers
+  vector_store_type: inmemory
+  table_descriptions:
+    sales_orders: "Customer sales transactions and order values"
+    customers: "Registered enterprise customer accounts"
+
+security:
+  read_only: true
+  max_rows: 100
+  query_timeout_seconds: 30.0
+
+response:
+  show_sql: true
+  include_sources: true
+
+conversation:
+  enabled: true
+  max_history_turns: 10
