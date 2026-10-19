@@ -45,8 +45,8 @@ export interface ChatbotConfig {
 export const DEFAULT_CONFIG: Required<Omit<ChatbotConfig, 'apiKey' | 'tenantId' | 'userId' | 'primaryColor'>> = {
   apiUrl: 'http://localhost:8000',
   assistantName: 'Sagar DB Assistant',
-  assistantSubtitle: 'SQL Server · 4 Enterprise Tables',
-  welcomeMessage: 'Hello! I can answer questions across your employee, department, project, and sales order tables in the Sagar database. Try asking me anything!',
+  assistantSubtitle: 'SQL Server · Sagar Database',
+  welcomeMessage: 'Hello! I am connected to your Sagar SQL Server database. Try asking me anything about your tables!',
   theme: 'dark',
   position: 'bottom-right',
   showSources: true,
