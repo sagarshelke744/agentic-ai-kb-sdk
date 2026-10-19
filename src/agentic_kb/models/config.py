@@ -75,26 +75,64 @@ class LLMConfig(BaseModel):
         return None
 
 
+# Canonical database type names (accepts common aliases) and their default ports
+DB_TYPE_ALIASES = {
+    "postgres": "postgresql",
+    "pg": "postgresql",
+    "mssql": "sqlserver",
+    "sql_server": "sqlserver",
+    "mariadb": "mysql",
+    "mongo": "mongodb",
+}
+DB_DEFAULT_PORTS = {"postgresql": 5432, "mysql": 3306, "sqlserver": 1433, "mongodb": 27017}
+DB_SQLALCHEMY_DRIVERS = {
+    "postgresql": "postgresql+psycopg2",
+    "mysql": "mysql+pymysql",
+    "sqlserver": "mssql+pymssql",
+}
+
+
 class DatabaseConfig(BaseModel):
     """Database connectivity and credentials configuration."""
-    type: str = Field(default="postgresql", description="Database dialect: postgresql or sqlserver")
+    type: str = Field(
+        default="postgresql",
+        description="Database type: postgresql, mysql (mariadb), sqlserver (mssql), mongodb (mongo)",
+    )
     host: str = Field(default="localhost")
-    port: int = Field(default=5432)
+    port: Optional[int] = Field(default=None, description="Defaults per type: 5432 / 3306 / 1433 / 27017")
     database: str = Field(..., description="Database name")
-    username: str = Field(..., description="Database username")
+    username: Optional[str] = Field(default=None, description="Database username")
     password_env: Optional[str] = Field(default="DB_PASSWORD", description="Environment variable holding DB password")
     password: Optional[str] = Field(default=None, description="Direct DB password")
+    url: Optional[str] = Field(default=None, description="Full connection URL (overrides host/port/user/password)")
+    url_env: Optional[str] = Field(default=None, description="Environment variable holding a full connection URL")
+    auth_source: Optional[str] = Field(default=None, description="MongoDB authSource (defaults to the database)")
+    options: Dict[str, Any] = Field(
+        default_factory=dict, description="Extra driver/URL options, e.g. {charset: utf8mb4} or {tls: true}"
+    )
     ssl_mode: Optional[str] = Field(default="prefer")
     connection_timeout_seconds: float = Field(default=10.0, gt=0)
     pool_size: int = Field(default=5, ge=1)
     max_overflow: int = Field(default=10, ge=0)
 
+    @field_validator("type")
+    @classmethod
+    def normalize_type(cls, v: str) -> str:
+        key = v.strip().lower()
+        return DB_TYPE_ALIASES.get(key, key)
+
     @field_validator("port")
     @classmethod
-    def validate_port(cls, v: int) -> int:
-        if not (1 <= v <= 65535):
+    def validate_port(cls, v: Optional[int]) -> Optional[int]:
+        if v is not None and not (1 <= v <= 65535):
             raise ValueError("Port must be between 1 and 65535")
         return v
+
+    @model_validator(mode="after")
+    def apply_default_port(self) -> "DatabaseConfig":
+        if self.port is None:
+            self.port = DB_DEFAULT_PORTS.get(self.type, 5432)
+        return self
 
     def get_password(self) -> Optional[str]:
         """Resolve password from direct field or environment variable."""
@@ -104,18 +142,55 @@ class DatabaseConfig(BaseModel):
             return os.getenv(self.password_env)
         return None
 
+    def get_url_override(self) -> Optional[str]:
+        """Full connection URL from `url` or the `url_env` environment variable, if provided."""
+        if self.url:
+            return self.url
+        if self.url_env:
+            return os.getenv(self.url_env)
+        return None
+
     def get_connection_url(self, async_driver: bool = False) -> str:
-        """Build SQLAlchemy connection string."""
-        pwd = self.get_password() or ""
-        pwd_part = f":{pwd}" if pwd else ""
-        user_pwd = f"{self.username}{pwd_part}"
-        if self.type == "postgresql":
-            driver = "postgresql+asyncpg" if async_driver else "postgresql+psycopg2"
-            return f"{driver}://{user_pwd}@{self.host}:{self.port}/{self.database}"
-        elif self.type == "sqlserver":
-            driver = "mssql+pymssql"
-            return f"{driver}://{user_pwd}@{self.host}:{self.port}/{self.database}"
-        raise ConfigurationError(f"Unsupported database type: {self.type}")
+        """Build the connection URL (SQLAlchemy URL for SQL databases, mongodb:// URI for MongoDB).
+
+        Credentials are escaped, so passwords containing characters such as '@', ':' or '/' work.
+        """
+        override = self.get_url_override()
+        if override:
+            return override
+
+        if self.type == "mongodb":
+            from urllib.parse import quote_plus, urlencode
+
+            creds = ""
+            if self.username:
+                creds = quote_plus(self.username)
+                if self.get_password():
+                    creds += ":" + quote_plus(self.get_password() or "")
+                creds += "@"
+            params = dict(self.options)
+            if self.username:
+                params.setdefault("authSource", self.auth_source or self.database)
+            query = f"/?{urlencode(params)}" if params else ""
+            return f"mongodb://{creds}{self.host}:{self.port}{query}"
+
+        driver = DB_SQLALCHEMY_DRIVERS.get(self.type)
+        if not driver:
+            raise ConfigurationError(f"Unsupported database type: {self.type}")
+        if async_driver and self.type == "postgresql":
+            driver = "postgresql+asyncpg"
+
+        from sqlalchemy.engine import URL
+
+        return URL.create(
+            drivername=driver,
+            username=self.username,
+            password=self.get_password(),
+            host=self.host,
+            port=self.port,
+            database=self.database,
+            query={k: str(v) for k, v in self.options.items()},
+        ).render_as_string(hide_password=False)
 
 
 class KnowledgeBaseConfig(BaseModel):

@@ -1,0 +1,50 @@
+# MongoDB example. Try it locally with:
+#   docker compose -f docker-compose.databases.yml up -d mongo
+#   pip install "agentic-kb[mongodb,gemini,api]"
+#
+# "tables" are collections and "columns" are field paths (nested fields as a.b.c), inferred by sampling
+# documents. The LLM writes aggregation pipelines which are validated as read-only before running.
+agent:
+  name: shop-assistant
+  description: Answers questions about the shop database (MongoDB)
+
+llm:
+  provider: gemini                 # gemini | groq | openai | azure
+  model: gemini-3.5-flash
+  api_key_env: GEMINI_API_KEY
+  temperature: 0.0
+
+database:
+  type: mongodb                    # also accepts: mongo
+  host: ${MONGO_HOST:-localhost}
+  port: 27017
+  database: shop
+  username: ${MONGO_USER:-kb_reader}
+  password_env: MONGO_PASSWORD     # kb_reader_pass for the docker-compose sample
+  # auth_source: shop              # defaults to the database name
+  # url_env: MONGO_URL             # alternative: full URI, e.g. Atlas "mongodb+srv://user:pass@cluster0.xxxx.mongodb.net/"
+  # options: { tls: true }         # extra URI options
+
+knowledgebase:
+  allowed_tables:                  # collections (database.collection or just the name)
+    - shop.customers
+    - shop.orders
+  catalog_file: catalog.mongodb.yaml
+
+security:
+  read_only: true                  # MongoDB has no read-only session: connect with a user that only has the `read` role
+  max_rows: 1000
+  query_timeout_seconds: 30.0
+
+response:
+  show_sql: true                   # shows the generated pipeline
+  include_sources: true
+
+cache:
+  enabled: false
+  type: memory
+  ttl_seconds: 300
+
+conversation:
+  enabled: true
+  max_history_turns: 10

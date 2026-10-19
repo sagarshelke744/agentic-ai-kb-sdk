@@ -13,7 +13,6 @@ from agentic_kb.database.models import (
     QueryResult,
     TableMetadata,
 )
-from agentic_kb.database.postgres import PostgreSQLProvider
 from agentic_kb.exceptions.errors import (
     AgenticKBError,
     ConfigurationError,
@@ -99,6 +98,9 @@ __all__ = [
     # Database Abstractions & Providers
     "BaseDatabaseProvider",
     "PostgreSQLProvider",
+    "MySQLProvider",
+    "SQLServerProvider",
+    "MongoDBProvider",
     "MockDatabaseProvider",
     "DatabaseProviderFactory",
     "ColumnMetadata",
@@ -156,3 +158,12 @@ __all__ = [
     "KnowledgeBaseError",
     "VectorStoreError",
 ]
+
+
+def __getattr__(name: str):
+    """Load driver-backed database providers on first use (their drivers are optional installs)."""
+    if name in ("PostgreSQLProvider", "MySQLProvider", "SQLServerProvider", "MongoDBProvider"):
+        import agentic_kb.database as _db
+
+        return getattr(_db, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

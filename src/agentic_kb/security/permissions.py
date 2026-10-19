@@ -6,6 +6,7 @@ from sqlglot import exp
 
 from agentic_kb.exceptions.errors import PermissionDeniedError
 from agentic_kb.observability.logging import get_logger
+from agentic_kb.security.dialects import sqlglot_dialect
 
 logger = get_logger("agentic_kb.security.permissions")
 
@@ -25,7 +26,7 @@ class PermissionEngine:
         self.allowed_tables = set(t.lower() for t in (allowed_tables or []))
         self.tenant_column = tenant_column
         self.user_column = user_column
-        self.dialect = dialect
+        self.dialect = sqlglot_dialect(dialect)
 
     def check_table_access(self, table_name: str) -> None:
         """Verify access to a specific table."""
@@ -52,20 +53,20 @@ class PermissionEngine:
 
         try:
             ast = sqlglot.parse_one(sql_query, read=self.dialect)
-        except Exception:
-            # If parsing fails here, let validator handle syntax error
-            return sql_query
+        except Exception as e:
+            # Fail closed: never run a query unscoped when tenant/user isolation was requested
+            raise PermissionDeniedError(
+                resource="row-level security could not be applied to the query"
+            ) from e
 
-        if isinstance(ast, exp.Select):
-            predicates: List[str] = []
-            if tenant_id:
-                predicates.append(f"{self.tenant_column} = '{tenant_id}'")
-            if user_id:
-                predicates.append(f"{self.user_column} = '{user_id}'")
+        if not isinstance(ast, exp.Select):
+            raise PermissionDeniedError(resource="row-level security supports SELECT queries only")
 
-            for pred in predicates:
-                ast = ast.where(pred, copy=False)
-
-            return ast.sql(dialect=self.dialect)
-
-        return sql_query
+        # Build predicates as AST nodes so ids are escaped as proper string literals (no injection)
+        for column, value in ((self.tenant_column, tenant_id), (self.user_column, user_id)):
+            if value:
+                ast = ast.where(
+                    exp.EQ(this=exp.column(column), expression=exp.Literal.string(str(value))),
+                    copy=False,
+                )
+        return ast.sql(dialect=self.dialect)

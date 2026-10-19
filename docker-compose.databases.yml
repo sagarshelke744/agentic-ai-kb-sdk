@@ -1,0 +1,79 @@
+# Optional databases for trying the SDK against MySQL, MongoDB and SQL Server locally.
+# Each service seeds a small "shop" dataset (customers + orders). Start only what you need:
+#
+#   docker compose -f docker-compose.databases.yml up -d mysql
+#   docker compose -f docker-compose.databases.yml up -d mongo
+#   docker compose -f docker-compose.databases.yml up -d mssql mssql-init
+#
+# Credentials below are for local development only.
+
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: agentic_kb_mysql
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root_pass
+      MYSQL_DATABASE: shop
+      MYSQL_USER: kb_reader
+      MYSQL_PASSWORD: kb_reader_pass
+    volumes:
+      - ./deploy/databases/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot_pass"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  mongo:
+    image: mongo:7
+    container_name: agentic_kb_mongo
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: root_pass
+      MONGO_INITDB_DATABASE: shop
+    volumes:
+      - ./deploy/databases/mongo/init.js:/docker-entrypoint-initdb.d/init.js:ro
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: agentic_kb_mssql
+    ports:
+      - "1433:1433"
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "Root_pass123"
+      MSSQL_PID: Developer
+    volumes:
+      - mssql_data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P 'Root_pass123' -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  # One-shot job: creates the "shop" database, the data and a read-only login for the SDK
+  mssql-init:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    depends_on:
+      mssql:
+        condition: service_healthy
+    volumes:
+      - ./deploy/databases/mssql/init.sql:/init.sql:ro
+    entrypoint: ["/opt/mssql-tools18/bin/sqlcmd", "-C", "-S", "mssql", "-U", "sa", "-P", "Root_pass123", "-i", "/init.sql"]
+    restart: "no"
+
+volumes:
+  mysql_data:
+  mongo_data:
+  mssql_data:

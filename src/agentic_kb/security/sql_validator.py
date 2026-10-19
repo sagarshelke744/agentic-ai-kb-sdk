@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 import sqlglot
 from sqlglot import exp
 
+from agentic_kb.security.dialects import sqlglot_dialect
 from agentic_kb.exceptions.errors import SQLValidationError
 from agentic_kb.observability.logging import get_logger
 
@@ -74,9 +75,7 @@ class SQLValidator:
         self.enforce_limit = enforce_limit
         self.max_joins = max_joins
         # Map SDK dialect names to sqlglot dialect names
-        self.dialect = {"postgresql": "postgres", "sqlserver": "tsql", "mssql": "tsql"}.get(
-            dialect.lower(), dialect.lower()
-        )
+        self.dialect = sqlglot_dialect(dialect)
 
     def validate(self, sql_query: str) -> SQLValidationResult:
         """Parse and validate SQL query against security boundaries."""

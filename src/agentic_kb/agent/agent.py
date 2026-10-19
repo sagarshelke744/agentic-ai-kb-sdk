@@ -27,6 +27,7 @@ from agentic_kb.models.request import ChatRequest
 from agentic_kb.models.response import AgentMetadata, ChatResponse, StreamChunk
 from agentic_kb.observability.events import reset_event_sink, set_event_sink
 from agentic_kb.observability.logging import get_logger
+from agentic_kb.security.mongo_validator import MongoPermissionEngine, MongoQueryValidator
 from agentic_kb.security.permissions import PermissionEngine
 from agentic_kb.security.sql_validator import SQLValidator
 
@@ -118,21 +119,33 @@ class AgenticKnowledgeBase:
             )
 
         # 3. Initialize Security Validator and Permission Engine
-        self.validator = SQLValidator(
-            allowed_schemas=self.config.knowledgebase.allowed_schemas,
-            allowed_tables=self.config.knowledgebase.allowed_tables,
-            allowed_columns=self.config.knowledgebase.allowed_columns,
-            read_only=self.config.security.read_only,
-            max_rows=self.config.security.max_rows,
-            enforce_limit=self.config.security.enforce_limit,
-            dialect=self.db.dialect_name,
-        )
+        if self.db.dialect_name == "mongodb":
+            # Document database: queries are JSON aggregation pipelines, not SQL
+            self.validator = MongoQueryValidator(
+                allowed_collections=self.config.knowledgebase.allowed_tables,
+                read_only=self.config.security.read_only,
+                max_rows=self.config.security.max_rows,
+                enforce_limit=self.config.security.enforce_limit,
+            )
+            self.permissions = MongoPermissionEngine(
+                allowed_tables=self.config.knowledgebase.allowed_tables,
+            )
+        else:
+            self.validator = SQLValidator(
+                allowed_schemas=self.config.knowledgebase.allowed_schemas,
+                allowed_tables=self.config.knowledgebase.allowed_tables,
+                allowed_columns=self.config.knowledgebase.allowed_columns,
+                read_only=self.config.security.read_only,
+                max_rows=self.config.security.max_rows,
+                enforce_limit=self.config.security.enforce_limit,
+                dialect=self.db.dialect_name,
+            )
 
-        self.permissions = PermissionEngine(
-            allowed_schemas=self.config.knowledgebase.allowed_schemas,
-            allowed_tables=self.config.knowledgebase.allowed_tables,
-            dialect=self.db.dialect_name,
-        )
+            self.permissions = PermissionEngine(
+                allowed_schemas=self.config.knowledgebase.allowed_schemas,
+                allowed_tables=self.config.knowledgebase.allowed_tables,
+                dialect=self.db.dialect_name,
+            )
 
         # 4. Initialize KnowledgeBase
         if self._injected_kb is not None:

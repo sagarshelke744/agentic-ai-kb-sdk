@@ -1,0 +1,47 @@
+# MySQL / MariaDB example. Try it locally with:
+#   docker compose -f docker-compose.databases.yml up -d mysql
+#   pip install "agentic-kb[mysql,gemini,api]"
+agent:
+  name: shop-assistant
+  description: Answers questions about the shop database (MySQL)
+
+llm:
+  provider: gemini                 # gemini | groq | openai | azure
+  model: gemini-3.5-flash
+  api_key_env: GEMINI_API_KEY
+  temperature: 0.0
+
+database:
+  type: mysql                      # also accepts: mariadb
+  host: ${MYSQL_HOST:-localhost}
+  port: 3306
+  database: shop                   # in MySQL a "schema" is a database
+  username: ${MYSQL_USER:-kb_reader}
+  password_env: MYSQL_PASSWORD     # kb_reader_pass for the docker-compose sample
+  # url_env: MYSQL_URL             # alternative: one full URL, e.g. mysql+pymysql://user:pass@host:3306/shop
+  # options: { charset: utf8mb4 }  # extra driver options; for TLS use ssl_ca etc. via url_env
+
+knowledgebase:
+  allowed_schemas: [shop]
+  allowed_tables:                  # schema.table, where schema = the MySQL database name
+    - shop.customers
+    - shop.orders
+  catalog_file: catalog.mysql.yaml # create with: agentic-kb catalog generate -c configs/mysql.yaml
+
+security:
+  read_only: true
+  max_rows: 1000
+  query_timeout_seconds: 30.0
+
+response:
+  show_sql: true
+  include_sources: true
+
+cache:
+  enabled: false
+  type: memory
+  ttl_seconds: 300
+
+conversation:
+  enabled: true
+  max_history_turns: 10

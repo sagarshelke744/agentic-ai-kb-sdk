@@ -153,16 +153,22 @@ class SQLAgentPlanner:
             raise
         except Exception:
             # Fallback to text generation
+            is_document_db = db.dialect_name == "mongodb"
             gen_result = llm.generate([
                 LLMMessage.system(sql_gen_prompt),
-                LLMMessage.user(f"Generate SQL for: {sanitized_question}\nReturn ONLY the SQL query."),
+                LLMMessage.user(
+                    f"Generate a query for: {sanitized_question}\n"
+                    + ("Return ONLY the JSON query object." if is_document_db else "Return ONLY the SQL query.")
+                ),
             ])
             raw_sql = gen_result.content.strip()
-            # Clean markdown code blocks if returned
-            if "```sql" in raw_sql:
-                raw_sql = raw_sql.split("```sql")[1].split("```")[0].strip()
-            elif "```" in raw_sql:
-                raw_sql = raw_sql.split("```")[1].split("```")[0].strip()
+            # Clean markdown code blocks (```sql / ```json / bare ```) if returned
+            if "```" in raw_sql:
+                raw_sql = raw_sql.split("```")[1]
+                first_line, _, rest = raw_sql.partition("\n")
+                if first_line.strip().lower() in ("sql", "json", "mongodb", "javascript", "js", "tsql", "mysql"):
+                    raw_sql = rest
+                raw_sql = raw_sql.strip()
 
         # Step 5: SQL AST Validation and Limit Enforcement
         _step("sql_validation")

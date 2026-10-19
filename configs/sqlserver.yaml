@@ -1,0 +1,46 @@
+# Microsoft SQL Server / Azure SQL example (T-SQL). Try it locally with:
+#   docker compose -f docker-compose.databases.yml up -d mssql mssql-init
+#   pip install "agentic-kb[sqlserver,gemini,api]"
+agent:
+  name: shop-assistant
+  description: Answers questions about the shop database (SQL Server)
+
+llm:
+  provider: gemini                 # gemini | groq | openai | azure
+  model: gemini-3.5-flash
+  api_key_env: GEMINI_API_KEY
+  temperature: 0.0
+
+database:
+  type: sqlserver                  # also accepts: mssql
+  host: ${MSSQL_HOST:-localhost}
+  port: 1433
+  database: shop
+  username: ${MSSQL_USER:-kb_reader}
+  password_env: MSSQL_PASSWORD     # Kb_reader_pass1 for the docker-compose sample
+  # url_env: MSSQL_URL             # alternative: mssql+pymssql://user:pass@host:1433/shop
+
+knowledgebase:
+  allowed_schemas: [dbo]
+  allowed_tables:                  # schema.table
+    - dbo.customers
+    - dbo.orders
+  catalog_file: catalog.sqlserver.yaml
+
+security:
+  read_only: true                  # SQL Server has no read-only session: use a login with only db_datareader
+  max_rows: 1000
+  query_timeout_seconds: 30.0
+
+response:
+  show_sql: true
+  include_sources: true
+
+cache:
+  enabled: false
+  type: memory
+  ttl_seconds: 300
+
+conversation:
+  enabled: true
+  max_history_turns: 10

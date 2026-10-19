@@ -297,6 +297,11 @@ class CatalogBuilder:
         use_llm: bool = True,
         overwrite: bool = False,
     ) -> Dict[str, Any]:
+        is_document_db = self.db.dialect_name == "mongodb"
+        if is_document_db and profile_values:
+            # Profiling and relation inference are SQL queries; fields/types already come from sampling
+            self.log("MongoDB: SQL value profiling and relation inference are skipped (schema comes from sampling).")
+            profile_values = False
         existing_tables = (existing or {}).get("tables", {}) if not overwrite else {}
         tables_out: Dict[str, Any] = {}
         row_counts: Dict[str, Optional[int]] = {}
@@ -306,7 +311,7 @@ class CatalogBuilder:
             self.log(f"  - {full_name}")
             old = existing_tables.get(full_name, {}) or {}
             old_cols = old.get("columns", {}) or {}
-            row_count = self._row_count(t) if profile_values else None
+            row_count = self._row_count(t) if profile_values else (t.estimated_row_count if is_document_db else None)
             row_counts[full_name] = row_count
             ranges = self._profile_ranges(t, row_count) if profile_values else {}
 
@@ -338,7 +343,7 @@ class CatalogBuilder:
             # relations: keep what a human has in the file, add newly inferred ones
             relations = list(old.get("relations", []) or [])
             known = {r.get("column") for r in relations}
-            for r in self._infer_relations(t, row_counts):
+            for r in ([] if is_document_db else self._infer_relations(t, row_counts)):
                 if r["column"] not in known:
                     relations.append(r)
             if relations:

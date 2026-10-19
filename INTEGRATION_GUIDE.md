@@ -23,7 +23,7 @@ Three ways to use it — pick one:
 ## 1. Prerequisites
 
 - Python **3.11+**
-- A database the SDK can reach (PostgreSQL supported; SQL Server supported via the `sqlserver` extra)
+- A database the SDK can reach: **PostgreSQL, MySQL / MariaDB, SQL Server or MongoDB** (see [Supported databases](#supported-databases))
 - One LLM API key: **Gemini**, **Groq**, **OpenAI** or **Azure OpenAI**
 - *(Optional)* Redis for caching / conversation memory — falls back to in-memory if unavailable
 - *(Widget only)* Node 18+
@@ -33,16 +33,25 @@ Three ways to use it — pick one:
 
 ## 2. Install
 
-```bash
-# from GitHub (replace with PyPI name once published)
-pip install "agentic-kb[postgres,llm,api] @ git+https://github.com/sagarshelke744/agentic-ai-kb-sdk.git"
+Install the SDK plus the extra for **your** database and LLM — only the drivers you use are required:
 
-# provider / feature packages not covered by the extras:
-pip install google-generativeai   # only if you use Gemini
-pip install redis                 # only if you enable the Redis cache
+```bash
+# from GitHub (replace with the PyPI name once published)
+pip install "agentic-kb[postgres,gemini,api] @ git+https://github.com/sagarshelke744/agentic-ai-kb-sdk.git"
 ```
 
-Groq and OpenAI both use the `openai` package, which the `llm` extra installs.
+| Extra | Installs | Needed for |
+|---|---|---|
+| `postgres` | SQLAlchemy, psycopg2, asyncpg | PostgreSQL |
+| `mysql` | SQLAlchemy, PyMySQL, cryptography | MySQL / MariaDB |
+| `sqlserver` | SQLAlchemy, pymssql | SQL Server / Azure SQL |
+| `mongodb` | PyMongo | MongoDB |
+| `gemini` | google-generativeai | Gemini LLM |
+| `llm` | openai | OpenAI, Azure OpenAI and Groq |
+| `redis` | redis | Redis cache |
+| `api` | FastAPI, uvicorn, SSE | REST API + widget backend |
+
+Combine them: `agentic-kb[mysql,llm,redis,api]`. If a driver is missing, the SDK tells you which extra to install.
 
 ## 3. Configure
 
@@ -83,9 +92,9 @@ llm:
   # base_url: https://my-gateway/v1   # optional: OpenAI-compatible gateway / proxy (groq, openai)
 
 database:
-  type: postgresql
+  type: postgresql                 # postgresql | mysql | sqlserver | mongodb  (see "Supported databases")
   host: ${DB_HOST:-localhost}
-  port: 5432
+  port: 5432                       # optional: defaults to 5432 / 3306 / 1433 / 27017 by type
   database: ${DB_NAME}
   username: ${DB_USER}
   password_env: DB_PASSWORD        # name of the env var holding the password
@@ -121,6 +130,62 @@ Tips for good answers:
 - Mixed-case columns (e.g. `carNo`) are handled automatically on PostgreSQL — the SDK quotes them for you.
 
 Ready-made examples live in `configs/` (`example.yaml` = Gemini, `groq.yaml` = Groq).
+
+---
+
+## Supported databases
+
+Switch databases by changing `database.type` (plus the matching extra from section 2). Ready-made configs
+live in `configs/`.
+
+| Database | `type` | Config | Notes |
+|---|---|---|---|
+| PostgreSQL | `postgresql` (`postgres`) | `example.yaml` | Read-only session + server-side statement timeout enforced |
+| MySQL / MariaDB | `mysql` (`mariadb`) | `mysql.yaml` | "Schema" = database name. Read-only session + execution-time limit |
+| SQL Server / Azure SQL | `sqlserver` (`mssql`) | `sqlserver.yaml` | T-SQL (`TOP`, `[brackets]`). No read-only session, so use a `db_datareader`-only login |
+| MongoDB | `mongodb` (`mongo`) | `mongodb.yaml` | Collections instead of tables; LLM writes aggregation pipelines. Use a user with only the `read` role |
+
+Connection options common to all:
+
+```yaml
+database:
+  type: mysql
+  host: db.example.com
+  database: shop
+  username: kb_reader
+  password_env: MYSQL_PASSWORD      # passwords with @ : / # are fine - they are escaped for you
+  url_env: DATABASE_URL             # OR give one full URL/URI (overrides host/port/user/password)
+  options: { charset: utf8mb4 }     # extra driver options (MongoDB: URI options such as tls: true)
+```
+
+Allow-lists use `schema.table` for SQL databases (`shop.orders`, `dbo.orders`, `public.orders`) and
+`database.collection` (or just `collection`) for MongoDB.
+
+**How MongoDB differs.** There is no fixed schema, so the SDK *samples* up to 100 documents per collection and
+infers field names and types, flattening nested objects to dotted paths (`customer.tier`, `items.sku`).
+The LLM answers with a JSON aggregation pipeline, for example:
+
+```json
+{"collection": "orders", "pipeline": [{"$match": {"status": "paid"}}, {"$group": {"_id": null, "revenue": {"$sum": "$total"}}}]}
+```
+
+which is checked before it runs: only read-only stages are allowed (`$match`, `$group`, `$lookup`, `$unwind`, ...),
+`$out` / `$merge` / `$function` / `$where` are rejected anywhere in the pipeline, `$lookup` can only target allowed
+collections, and a `$limit` is always applied. `tenant_id` / `user_id` row-level security is injected as a
+leading `$match` — including inside `$lookup`. `catalog generate` works for MongoDB too, but only the
+LLM-written descriptions part (value profiling and relation inference are SQL-only).
+
+**Try each locally** (sample `shop` data and a read-only user are created for you):
+
+```bash
+docker compose -f docker-compose.databases.yml up -d mysql          # or: mongo   |   mssql mssql-init
+agentic-kb check -c configs/mysql.yaml
+agentic-kb catalog generate -c configs/mysql.yaml
+agentic-kb serve -c configs/mysql.yaml
+```
+
+Add a database of your own with `DatabaseProviderFactory.register("name", YourProvider)` (subclass
+`BaseDatabaseProvider`, or `SQLAlchemyProvider` for anything SQLAlchemy can reach).
 
 ---
 
@@ -414,6 +479,9 @@ Then try the widget: build it (section C), run `python -m http.server 8080` in t
 | "rate limit" / "usage quota reached" | Provider limit. Wait, switch `model:`, switch provider, or use a billed key |
 | `Unknown dialect 'postgresql'` | Old version — update the SDK |
 | 400 `SQL Validation Failed` | The model produced a non-SELECT or a disallowed table; rephrase or widen `allowed_tables` |
+| `The 'mysql' driver is not installed` | `pip install agentic-kb[mysql]` (same for `sqlserver`, `mongodb`) |
+| MySQL: `Unknown table 'orders'` | Use `database.table` names (`shop.orders`); in MySQL the schema *is* the database |
+| SQL Server: `Incorrect syntax near 'user'` | Reserved-word table; the SDK brackets it automatically, so make sure the table is in `allowed_tables` |
 | `password authentication failed` | `.env` DB creds point at a different Postgres than you expect (check which one listens on 5432) |
 | Gemini / Redis `ImportError` | `pip install google-generativeai` / `pip install redis` |
 | Widget shows no live steps | Rebuild it (`npm run build`) — old bundles can't read the stream |

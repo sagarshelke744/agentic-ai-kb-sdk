@@ -1,24 +1,33 @@
 """Database Provider Factory and Extensible Registry."""
 
-from typing import Any, Dict, List, Optional, Type, Union
+import importlib
+from typing import Any, Dict, List, Type, Union
 
 from agentic_kb.database.base import BaseDatabaseProvider
 from agentic_kb.database.mock import MockDatabaseProvider
-from agentic_kb.database.postgres import PostgreSQLProvider
 from agentic_kb.exceptions.errors import ConfigurationError
 from agentic_kb.models.config import DatabaseConfig
+
+# Built-in providers are imported lazily so only the driver you actually use needs to be installed.
+# name -> ("module path", "class name", "pip extra that provides the driver")
+_BUILTIN: Dict[str, tuple] = {
+    "postgresql": ("agentic_kb.database.postgres", "PostgreSQLProvider", "postgres"),
+    "postgres": ("agentic_kb.database.postgres", "PostgreSQLProvider", "postgres"),
+    "mysql": ("agentic_kb.database.mysql", "MySQLProvider", "mysql"),
+    "sqlserver": ("agentic_kb.database.sqlserver", "SQLServerProvider", "sqlserver"),
+    "mongodb": ("agentic_kb.database.mongodb", "MongoDBProvider", "mongodb"),
+}
 
 
 class DatabaseProviderFactory:
     """
     Registry and factory for Database providers.
 
-    Supports built-in providers (PostgreSQL, SQLite/Mock) and extensible user-registered providers.
+    Built in: PostgreSQL, MySQL/MariaDB, SQL Server, MongoDB, plus SQLite/Mock for tests.
+    Custom adapters can be registered with `DatabaseProviderFactory.register`.
     """
 
     _registry: Dict[str, Type[BaseDatabaseProvider]] = {
-        "postgresql": PostgreSQLProvider,
-        "postgres": PostgreSQLProvider,
         "sqlite": MockDatabaseProvider,
         "mock": MockDatabaseProvider,
     }
@@ -30,7 +39,6 @@ class DatabaseProviderFactory:
 
         Example:
         ```python
-        DatabaseProviderFactory.register("sqlserver", SQLServerProvider)
         DatabaseProviderFactory.register("snowflake", SnowflakeProvider)
         ```
         """
@@ -43,7 +51,26 @@ class DatabaseProviderFactory:
     @classmethod
     def get_registered_providers(cls) -> List[str]:
         """Return list of currently registered database providers."""
-        return list(cls._registry.keys())
+        return list(dict.fromkeys([*_BUILTIN, *cls._registry]))
+
+    @classmethod
+    def _resolve(cls, db_type: str) -> Type[BaseDatabaseProvider]:
+        if db_type in cls._registry:  # user registrations (and mock) win
+            return cls._registry[db_type]
+        if db_type in _BUILTIN:
+            module, class_name, extra = _BUILTIN[db_type]
+            try:
+                return getattr(importlib.import_module(module), class_name)
+            except ImportError as e:
+                raise ConfigurationError(
+                    f"The '{db_type}' driver is not installed ({e.name or e}). "
+                    f"Install it with `pip install agentic-kb[{extra}]`."
+                ) from e
+        available = ", ".join(cls.get_registered_providers())
+        raise ConfigurationError(
+            f"Unsupported database type '{db_type}'. Supported types are: {available}. "
+            f"You can register a custom database adapter via `DatabaseProviderFactory.register('{db_type}', YourProviderClass)`."
+        )
 
     @classmethod
     def create(
@@ -59,11 +86,9 @@ class DatabaseProviderFactory:
         - A DatabaseConfig model instance
         - A dictionary matching DatabaseConfig fields
         """
-        # 1. Direct dependency injection
         if isinstance(config, BaseDatabaseProvider):
             return config
 
-        # 2. Parse config
         if isinstance(config, dict):
             db_cfg = DatabaseConfig(**config)
         elif isinstance(config, DatabaseConfig):
@@ -73,18 +98,7 @@ class DatabaseProviderFactory:
                 f"Expected DatabaseConfig, dict, or BaseDatabaseProvider, got {type(config).__name__}"
             )
 
-        db_type = db_cfg.type.lower()
-        provider_cls = cls._registry.get(db_type)
-
-        if not provider_cls:
-            available = ", ".join(cls._registry.keys())
-            raise ConfigurationError(
-                f"Unsupported database type '{db_cfg.type}'. Supported types are: {available}. "
-                f"You can register a custom database adapter via `DatabaseProviderFactory.register('{db_type}', YourProviderClass)`."
-            )
-
-        if provider_cls is PostgreSQLProvider:
-            return PostgreSQLProvider(config=db_cfg, **kwargs)
+        provider_cls = cls._resolve(db_cfg.type.lower())
 
         if provider_cls is MockDatabaseProvider:
             return MockDatabaseProvider(database_name=db_cfg.database, **kwargs)

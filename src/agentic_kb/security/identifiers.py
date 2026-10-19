@@ -1,4 +1,4 @@
-"""Identifier case handling for case-folding databases (PostgreSQL).
+"""Identifier case and quoting fixes for generated SQL (PostgreSQL, MySQL, SQL Server).
 
 PostgreSQL folds unquoted identifiers to lower case, so a column created as "carNo" must be
 referenced as "carNo". LLMs routinely emit `carNo` unquoted, which then fails with
@@ -13,10 +13,11 @@ from sqlglot import exp
 
 from agentic_kb.database.models import DatabaseSchemaMetadata
 from agentic_kb.observability.logging import get_logger
+from agentic_kb.security.dialects import sqlglot_dialect
 
 logger = get_logger("agentic_kb.security.identifiers")
 
-CASE_FOLDING_DIALECTS = {"postgres", "postgresql"}
+FIXED_DIALECTS = {"postgres", "mysql", "tsql"}  # sqlglot dialect names
 
 
 # PostgreSQL reserved words that must be quoted when used as identifiers
@@ -47,17 +48,19 @@ def _unique_spellings(names) -> Dict[str, str]:
 def fix_identifier_case(sql: str, schema: DatabaseSchemaMetadata, dialect: str) -> str:
     """Return `sql` with table/column identifiers matched to the schema's exact spelling.
 
-    Only applies to case-folding dialects. Returns the input unchanged if it can't be parsed
-    (the SQL validator reports syntax errors) or nothing needed fixing.
+    Applies to PostgreSQL (case-folding), MySQL (case-sensitive table names on Linux) and SQL Server
+    (reserved words such as `user` / `order` need bracket quoting). Returns the input unchanged if it
+    can't be parsed (the SQL validator reports syntax errors) or nothing needed fixing.
     """
-    if dialect.lower() not in CASE_FOLDING_DIALECTS:
+    glot = sqlglot_dialect(dialect)
+    if glot not in FIXED_DIALECTS:
         return sql
 
     columns = _unique_spellings(c.name for t in schema.tables.values() for c in t.columns)
     tables = _unique_spellings(t.table_name for t in schema.tables.values())
 
     try:
-        tree = sqlglot.parse_one(sql, read="postgres")
+        tree = sqlglot.parse_one(sql, read=glot)
     except Exception:
         return sql
     if tree is None:
@@ -85,6 +88,6 @@ def fix_identifier_case(sql: str, schema: DatabaseSchemaMetadata, dialect: str) 
 
     if not changed:
         return sql
-    fixed = tree.sql(dialect="postgres")
+    fixed = tree.sql(dialect=glot)
     logger.info("Normalized identifier case/quoting in generated SQL")
     return fixed
