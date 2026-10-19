@@ -1,0 +1,82 @@
+# ============================================================
+# Agentic KB — SQL Server Configuration
+# Server  : DESKTOP-EF69CVF\SQLEXPRESS
+# Database: Sagar
+# Schema  : dbo
+# Auth    : Windows Authentication (Trusted Connection)
+# ============================================================
+# Usage:
+#   from agentic_kb.models.config import AgenticKBConfig
+#   config = AgenticKBConfig.from_yaml("configs/sqlserver.yaml")
+#
+# Required env (in .env file or system environment):
+#   # If using OpenAI (as configured below):
+#   OPENAI_API_KEY=sk-proj-your_actual_openai_key_here
+#
+#   # Or if you prefer Groq (free at https://console.groq.com/keys):
+#   GROQ_API_KEY=gsk_your_groq_key_here
+#
+#   No DB password needed — Windows Authentication is used
+
+agent:
+  name: sagar-db-assistant
+  description: Agentic AI assistant for the Sagar SQL Server database
+  version: "1.0.0"
+
+# ── LLM ──────────────────────────────────────────────────────
+llm:
+  provider: mock
+  model: offline-sql-engine
+  temperature: 0.0
+  max_tokens: 2000
+  timeout_seconds: 60
+
+# ── Database ─────────────────────────────────────────────────
+database:
+  type: sqlserver
+  host: "DESKTOP-EF69CVF\\SQLEXPRESS"   # named instance — backslash escaped in YAML
+  port: 1433
+  database: Sagar
+  username: ""                           # leave blank for Windows Authentication
+  password_env: ""                       # leave blank for Windows Authentication
+  connection_timeout_seconds: 10
+  pool_size: 3
+  max_overflow: 5
+
+# ── Knowledge Base ───────────────────────────────────────────
+knowledgebase:
+  allowed_schemas:
+    - dbo
+
+  allowed_tables:
+    - dbo.employee
+    - dbo.departments
+    - dbo.projects
+    - dbo.orders
+
+  table_descriptions:
+    dbo.employee: "Contains employee records including salary, department, job post, and hire dates."
+    dbo.departments: "Organization department profiles, manager names, annual budgets, and headcounts."
+    dbo.projects: "Active and completed business initiatives, budgets, project lead departments, and timeline dates."
+    dbo.orders: "Customer sales orders, order status, total amount, shipping city, and assigned sales representatives."
+
+security:
+  read_only: true
+  max_rows: 1000
+  query_timeout_seconds: 30
+  block_ddl: true
+  mask_pii: true
+
+response:
+  show_sql: true          # show generated SQL (useful for debugging)
+  include_sources: true
+
+conversation:
+  enabled: true
+  max_history_turns: 10
+  storage_type: memory
+
+cache:
+  enabled: false
+  type: memory
+  ttl_seconds: 300

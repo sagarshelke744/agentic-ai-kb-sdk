@@ -43,9 +43,10 @@ class ConfigurationError(AgenticKBError):
     """Raised when configuration is invalid, missing, or malformed."""
 
     def __init__(self, message: str, details: Optional[Dict[str, Any]] = None):
+        safe_msg = message if "API key" in message else "System configuration error. Please contact the administrator."
         super().__init__(
             message=message,
-            user_safe_message="System configuration error. Please contact the administrator.",
+            user_safe_message=safe_msg,
             details=details,
         )
 

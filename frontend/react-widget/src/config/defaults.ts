@@ -44,21 +44,23 @@ export interface ChatbotConfig {
 
 export const DEFAULT_CONFIG: Required<Omit<ChatbotConfig, 'apiKey' | 'tenantId' | 'userId' | 'primaryColor'>> = {
   apiUrl: 'http://localhost:8000',
-  assistantName: 'Data Intelligence Assistant',
-  assistantSubtitle: 'Grounded in Enterprise KnowledgeBase',
-  welcomeMessage: 'Hello! I am your enterprise database assistant. You can ask me natural language questions about your business metrics, transactions, and data.',
+  assistantName: 'Sagar DB Assistant',
+  assistantSubtitle: 'SQL Server · 4 Enterprise Tables',
+  welcomeMessage: 'Hello! I can answer questions across your employee, department, project, and sales order tables in the Sagar database. Try asking me anything!',
   theme: 'dark',
   position: 'bottom-right',
   showSources: true,
   showExecutionSteps: true,
   enableStreaming: true,
   suggestedPrompts: [
-    'What were our total sales last month?',
-    'Show top 5 customers by revenue',
-    'Which products had zero orders in Q3?',
-    'Explain the structure of orders and customers'
+    'Who earns the highest salary?',
+    'Which department has the highest budget?',
+    'Show all projects currently in progress',
+    'What is our total revenue from orders?',
+    'Which orders were shipped or delivered to Mumbai?',
+    'List all department managers and locations',
   ],
   isFloating: true,
-  isOpenDefault: false,
+  isOpenDefault: true,
   persistSession: true
 };

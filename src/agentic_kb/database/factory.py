@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional, Type, Union
 from agentic_kb.database.base import BaseDatabaseProvider
 from agentic_kb.database.mock import MockDatabaseProvider
 from agentic_kb.database.postgres import PostgreSQLProvider
+from agentic_kb.database.sqlserver import SQLServerProvider
 from agentic_kb.exceptions.errors import ConfigurationError
 from agentic_kb.models.config import DatabaseConfig
 
@@ -19,6 +20,8 @@ class DatabaseProviderFactory:
     _registry: Dict[str, Type[BaseDatabaseProvider]] = {
         "postgresql": PostgreSQLProvider,
         "postgres": PostgreSQLProvider,
+        "sqlserver": SQLServerProvider,
+        "mssql": SQLServerProvider,
         "sqlite": MockDatabaseProvider,
         "mock": MockDatabaseProvider,
     }
@@ -85,6 +88,9 @@ class DatabaseProviderFactory:
 
         if provider_cls is PostgreSQLProvider:
             return PostgreSQLProvider(config=db_cfg, **kwargs)
+
+        if provider_cls is SQLServerProvider:
+            return SQLServerProvider(config=db_cfg, driver="pyodbc", **kwargs)
 
         if provider_cls is MockDatabaseProvider:
             return MockDatabaseProvider(database_name=db_cfg.database, **kwargs)

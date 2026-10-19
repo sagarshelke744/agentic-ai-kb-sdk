@@ -10,10 +10,12 @@ from agentic_kb.database.models import (
     TableMetadata,
 )
 from agentic_kb.database.postgres import PostgreSQLProvider
+from agentic_kb.database.sqlserver import SQLServerProvider
 
 __all__ = [
     "BaseDatabaseProvider",
     "PostgreSQLProvider",
+    "SQLServerProvider",
     "MockDatabaseProvider",
     "DatabaseProviderFactory",
     "ColumnMetadata",

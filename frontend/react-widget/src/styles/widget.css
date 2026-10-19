@@ -221,9 +221,9 @@
 .akb-window.akb-floating {
   position: fixed;
   z-index: 999998;
-  width: 440px;
+  width: 480px;
   height: 680px;
-  max-width: calc(100vw - 48px);
+  max-width: calc(100vw - 32px);
   max-height: calc(100vh - 120px);
   animation: akb-window-in 0.35s var(--akb-ease-spring) forwards;
 }
@@ -490,6 +490,11 @@
   display: flex;
   flex-direction: column;
   max-width: 82%;
+  min-width: 0;
+}
+
+.akb-msg-assistant .akb-msg-body {
+  max-width: 92%;
 }
 
 .akb-msg-bubble {
@@ -497,8 +502,9 @@
   border-radius: var(--akb-radius-md);
   font-size: 14px;
   line-height: 1.6;
-  word-break: break-word;
   position: relative;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .akb-msg-user .akb-msg-bubble {
@@ -506,6 +512,7 @@
   color: var(--akb-msg-user-text);
   border-bottom-right-radius: 4px;
   box-shadow: 0 4px 14px var(--akb-primary-glow);
+  word-break: break-word;
 }
 
 .akb-msg-assistant .akb-msg-bubble {
@@ -656,27 +663,60 @@
   margin-bottom: 4px;
 }
 
+/* Responsive Table Wrapper & Markdown Table */
+.akb-table-wrapper {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 12px 0;
+  border-radius: var(--akb-radius-sm);
+  border: 1px solid var(--akb-border-subtle);
+  background: var(--akb-bg-surface);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(99, 102, 241, 0.4) transparent;
+}
+
+.akb-table-wrapper::-webkit-scrollbar {
+  height: 6px;
+}
+
+.akb-table-wrapper::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.akb-table-wrapper::-webkit-scrollbar-thumb {
+  background: rgba(99, 102, 241, 0.4);
+  border-radius: 3px;
+}
+
+.akb-table-wrapper::-webkit-scrollbar-thumb:hover {
+  background: rgba(99, 102, 241, 0.7);
+}
+
 .akb-markdown table {
   width: 100%;
+  min-width: max-content;
   border-collapse: collapse;
-  margin: 12px 0;
   font-size: 13px;
-  border-radius: var(--akb-radius-sm);
-  overflow: hidden;
-  border: 1px solid var(--akb-border-subtle);
+  border-spacing: 0;
 }
 
 .akb-markdown th {
   background: var(--akb-bg-elevated);
-  padding: 8px 12px;
+  padding: 8px 14px;
   font-weight: 600;
   text-align: left;
+  white-space: nowrap !important;
   border-bottom: 1px solid var(--akb-border-subtle);
+  color: var(--akb-text-primary);
 }
 
 .akb-markdown td {
-  padding: 8px 12px;
+  padding: 8px 14px;
+  white-space: nowrap !important;
   border-bottom: 1px solid var(--akb-border-divider);
+  color: var(--akb-text-secondary);
 }
 
 .akb-markdown tr:last-child td {

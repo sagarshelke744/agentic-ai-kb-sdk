@@ -68,10 +68,22 @@ class LLMConfig(BaseModel):
 
     def get_api_key(self) -> Optional[str]:
         """Resolve API key from direct field or environment variable."""
-        if self.api_key:
-            return self.api_key
+        if self.api_key and self.api_key.strip():
+            return self.api_key.strip()
         if self.api_key_env:
-            return os.getenv(self.api_key_env)
+            val = os.getenv(self.api_key_env)
+            if val and val.strip() and not val.startswith("your_") and not val.startswith("sk-proj-your_"):
+                return val.strip()
+        # Fallbacks for standard provider keys
+        provider_lower = self.provider.lower()
+        if provider_lower == "openai":
+            val = os.getenv("OPENAI_API_KEY")
+            if val and not val.startswith("your_") and not val.startswith("sk-proj-your_"):
+                return val.strip()
+        elif provider_lower == "groq":
+            val = os.getenv("GROQ_API_KEY")
+            if val and not val.startswith("your_") and not val.startswith("gsk_your_"):
+                return val.strip()
         return None
 
 
@@ -105,16 +117,18 @@ class DatabaseConfig(BaseModel):
         return None
 
     def get_connection_url(self, async_driver: bool = False) -> str:
-        """Build SQLAlchemy connection string."""
+        """Build SQLAlchemy connection string for PostgreSQL or SQL Server."""
         pwd = self.get_password() or ""
         pwd_part = f":{pwd}" if pwd else ""
         user_pwd = f"{self.username}{pwd_part}"
-        if self.type == "postgresql":
+        db_type = self.type.lower()
+        if db_type in ("postgresql", "postgres"):
             driver = "postgresql+asyncpg" if async_driver else "postgresql+psycopg2"
             return f"{driver}://{user_pwd}@{self.host}:{self.port}/{self.database}"
-        elif self.type == "sqlserver":
+        elif db_type in ("sqlserver", "mssql"):
             driver = "mssql+pymssql"
-            return f"{driver}://{user_pwd}@{self.host}:{self.port}/{self.database}"
+            port = self.port if self.port != 5432 else 1433  # default to MSSQL port
+            return f"{driver}://{user_pwd}@{self.host}:{port}/{self.database}"
         raise ConfigurationError(f"Unsupported database type: {self.type}")
 
 

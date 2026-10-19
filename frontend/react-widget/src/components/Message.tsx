@@ -39,10 +39,13 @@ export const Message: React.FC<MessageProps> = ({
   const renderedHtml = useMemo(() => {
     if (!message.content) return '';
     try {
-      const rawHtml = marked.parse(message.content, { async: false, gfm: true, breaks: true }) as string;
+      let rawHtml = marked.parse(message.content, { async: false, gfm: true, breaks: true }) as string;
+      if (rawHtml.includes('<table')) {
+        rawHtml = rawHtml.replace(/<table/g, '<div class="akb-table-wrapper"><table').replace(/<\/table>/g, '</table></div>');
+      }
       return DOMPurify.sanitize(rawHtml, {
         ALLOWED_TAGS: [
-          'p', 'b', 'i', 'em', 'strong', 'a', 'ul', 'ol', 'li', 'code', 'pre',
+          'div', 'p', 'b', 'i', 'em', 'strong', 'a', 'ul', 'ol', 'li', 'code', 'pre',
           'table', 'thead', 'tbody', 'tr', 'th', 'td', 'blockquote', 'h1', 'h2', 'h3', 'h4', 'span'
         ],
         ALLOWED_ATTR: ['href', 'target', 'class', 'style', 'title']
